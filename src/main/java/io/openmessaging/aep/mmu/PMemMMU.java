@@ -8,7 +8,7 @@ public class PMemMMU  implements MMU{
 
     public PMemMMU(String path, long size) {
         boolean initialized = Heap.exists(path);
-        Heap heap = initialized ? Heap.openHeap(path) : Heap.createHeap(path, size);
+        heap = initialized ? Heap.openHeap(path) : Heap.createHeap(path, size);
     }
     @Override
     /**

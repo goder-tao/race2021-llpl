@@ -21,6 +21,13 @@ public class SSDWriterReader implements DiskReader, DiskWriter {
         ByteBuffer data = null;
         try {
             RandomAccessFile file = new RandomAccessFile(path, "rw");
+            long fl = file.length();
+            // 超出文件范围
+            if(offset >= fl) {
+                return null;
+            }
+            // 是否offset+size超出文件范围
+            size = offset+size > fl ? (int) (fl - offset) : size;
             byte[] b = new byte[size];
             file.seek(offset);
             file.read(b);
@@ -93,6 +100,9 @@ public class SSDWriterReader implements DiskReader, DiskWriter {
         String partitionPath = PartitionMaker.makePartitionPath(partition, DataFileBasicInfo.FILE_NAME_LENGTH, DataFileBasicInfo.ITEM_NUM);
         // 读索引文件
         ByteBuffer indexData = read(MntPath.SSD_PATH + topic+"/"+queueId+"/"+partitionPath+".index", indexFileOffset*10, fetchNum*10);
+        if(indexData == null) {
+            return map;
+        }
         long SSDDataStartOffset = -1L;
         int SSDReadBlockSize = 0;
         int[] size = new int[fetchNum];
@@ -115,5 +125,10 @@ public class SSDWriterReader implements DiskReader, DiskWriter {
             map.put(offset+i, bytes);
         }
         return map;
+    }
+
+    public static void main(String[] args) {
+        SSDWriterReader ssdWriterReader = new SSDWriterReader();
+        ssdWriterReader.read("/home/tao/Data/Software/project/java/mq-sample/a.txt", 5,5);
     }
 }

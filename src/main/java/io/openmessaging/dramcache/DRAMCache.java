@@ -2,12 +2,17 @@ package io.openmessaging.dramcache;
 
 import io.openmessaging.constant.StorageSize;
 import io.openmessaging.util.SystemMemory;
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
+import sun.misc.Lock;
 
 import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+
 public class DRAMCache {
+    private final Logger logger = LogManager.getLogger(DRAMCache.class.getName());
     // 定时监视内存情况
     private Thread updateAvailableMemory;
     // key为topic+qid组合
@@ -16,10 +21,13 @@ public class DRAMCache {
     private final long memoryDownThreshold = StorageSize.MB * 500;
     // 当前内存
     private long currentMemory = 0L;
-    // 内存监视频率
-    private final int freq = 1000;
+    // 内存监视频率(100ms)
+    private final int freq = 100;
+    // 单例
+    private volatile static DRAMCache cache;
 
-    public DRAMCache() {
+    private DRAMCache() {
+        currentMemory = SystemMemory.getSystemAvailableMemory();
         updateAvailableMemory = new Thread(new Runnable() {
             @Override
             public void run() {
@@ -34,6 +42,20 @@ public class DRAMCache {
             }
         });
         updateAvailableMemory.start();
+    }
+
+    private static Lock lock = new Lock();
+    /**
+     * 单例模式*/
+    public static DRAMCache createOrGetCache() {
+        if (cache == null) {
+            synchronized (DRAMCache.class) {
+                if (cache == null) {
+                    cache = new DRAMCache();
+                }
+            }
+        }
+        return cache;
     }
 
     public void put(String topicAndQId, long off, ByteBuffer v) {

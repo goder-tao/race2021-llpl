@@ -4,6 +4,7 @@ import io.openmessaging.aep.util.PmemBlock;
 import io.openmessaging.ssd.SSDWriterReader;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
+import sun.misc.Lock;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -22,6 +23,10 @@ public class Disk2AepScheduler {
     // 保存在aep中的handle
     private final ConcurrentHashMap<String, Map<Integer, Map<Long, Long>>> topicQueueOffsetHandle;
     private final Logger logger = LogManager.getLogger(Disk2AepScheduler.class.getName());
+    // 单例线程锁
+    private Lock lock = new Lock();
+    // 单例线程只开一次
+    private Thread thread = null;
     public Disk2AepScheduler(PmemBlock pmemBlock, ConcurrentHashMap<String, Map<Integer, Map<Long, Long>>> topicQueueOffsetHandle) {
         this.pmemBlock = pmemBlock;
         this.topicQueueOffsetHandle = topicQueueOffsetHandle;
@@ -30,34 +35,41 @@ public class Disk2AepScheduler {
     /**
      * start scheduling*/
     public void run() {
-        if (!isWork) {
-            isWork = true;
-            Thread thread = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    PriorityListNode move;
-                    // 不停调度
-                    while (true) {
-                        move = queuePriorityList.head;
-                        // 寻找一个合适的queue进行调度
+        try {
+            lock.lock();
+            if(thread == null) {
+                thread = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        PriorityListNode move;
+                        // 不停调度
                         while (true) {
-                            if(System.currentTimeMillis()-move.availableTime>0) {  // 可调度
-                                new Thread(new SchedulerWorker(move)).start();
-                                break;
-                            } else {  // 不可调度转到优先队列下一个节点
-                                move = move.next;
+                            move = queuePriorityList.head;
+                            // 寻找一个合适的queue进行调度
+                            while (move != null) {
+                                if(System.currentTimeMillis()-move.availableTime>0) {  // 可调度
+                                    new Thread(new SchedulerWorker(move)).start();
+                                    break;
+                                } else {  // 不可调度转到优先队列下一个节点
+                                    move = move.next;
+                                }
+                            }
+                            try {
+                                // 调度间隔期
+                                Thread.sleep(10);
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
                             }
                         }
-                        try {
-                            // 调度间隔期
-                            Thread.sleep(10);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
                     }
-                }
-            });
-            thread.start();
+                });
+                thread.start();
+            }
+            lock.unlock();
+        } catch (Exception e) {
+            System.out.println("Scheduler new thread,"+e.toString());
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -73,7 +85,7 @@ public class Disk2AepScheduler {
             long tailOffset = move.tailOffset.get();
             // 直接一次性预调度100数据
             int fetchNum = 100;
-            Map<Long, byte[]> offsetDataMap = ssdWriterReader.directRead(move.topic, move.queueId, move.tailOffset.get()+1, fetchNum);
+            Map<Long, byte[]> offsetDataMap = ssdWriterReader.directRead(move.topic, move.queueId, tailOffset, fetchNum);
             Map<Integer, Map<Long, Long>> queueOffsetHandle = getOrPutDefault(topicQueueOffsetHandle, move.topic, new ConcurrentHashMap<>());
             Map<Long, Long> offsetHandle = getOrPutDefault(queueOffsetHandle, move.queueId, new ConcurrentHashMap<>());
             // 尝试调度入aep
@@ -84,16 +96,18 @@ public class Disk2AepScheduler {
                     offsetHandle.put(offset, handle);
                 } else {  // 分配空间失败，空间不足，修改tailOffset,退出
                     logger.info("Aep full, queue scheduling exist");
-                    move.tailOffset.set(offset-1);
+                    move.tailOffset.set(offset);
                     break;
                 }
             }
-            if(move.queueDataSize.get() < pmemBlock.getSize()/queuePriorityList.node_n*0.8) {
-                // 稀疏队列，下次可调度的时间较短
-                move.availableTime = System.currentTimeMillis() + 1000;
-            } else {
-                // 拥挤队列，下次可调度的时间较长
-                move.availableTime = System.currentTimeMillis() + 3000;
+            if (offsetDataMap.size() > 0) {
+                if(move.queueDataSize.get() < pmemBlock.getSize()/queuePriorityList.node_n*0.8) {
+                    // 稀疏队列，下次可调度的时间较短
+                    move.availableTime = System.currentTimeMillis() + 1000;
+                } else {
+                    // 拥挤队列，下次可调度的时间较长
+                    move.availableTime = System.currentTimeMillis() + 3000;
+                }
             }
         }
     }

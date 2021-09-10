@@ -13,10 +13,11 @@ import java.nio.ByteBuffer;
  * 一块指定大小可以直接操作的aep block*/
 public class PmemBlock implements PmemWriter, PmemReader {
     private final PMemMMU pMemMMU;
-    private Logger logger = LogManager.getLogger(PmemBlock.class.getName());
+    private final Logger logger = LogManager.getLogger(PmemBlock.class.getName());
     private long size;
     public PmemBlock(String path, long size) {
         pMemMMU = new PMemMMU(path, size);
+        this.size = size;
     }
 
     @Override

@@ -4,6 +4,7 @@ import io.openmessaging.aep.util.PmemBlock;
 import io.openmessaging.constant.DataFileBasicInfo;
 import io.openmessaging.constant.MntPath;
 import io.openmessaging.constant.StatusCode;
+import io.openmessaging.constant.StorageSize;
 import io.openmessaging.dramcache.DRAMCache;
 import io.openmessaging.scheduler.Disk2AepScheduler;
 import io.openmessaging.scheduler.PriorityListNode;
@@ -24,7 +25,8 @@ import java.util.concurrent.FutureTask;
 
 public class Manager {
     // aep冷空间和热空间
-    private PmemBlock coolBlock, hotBlock;
+    private final PmemBlock coolBlock;
+    private final PmemBlock hotBlock;
     private final Logger logger = LogManager.getLogger(Manager.class.getName());
     private final SSDWriterReader ssdWriterReader = new SSDWriterReader();
     // 保存每个冷queue在aep冷空间的最后一个offset值
@@ -42,12 +44,12 @@ public class Manager {
     // lock definition
     private final Lock writeLock = new Lock();
     // memory cache
-    private DRAMCache dramCache;
-    private byte stage = 0;
+    private volatile DRAMCache dramCache;
+    private int stage = 0;
 
     public Manager() {
-        coolBlock = new PmemBlock(MntPath.AEP_PATH+"cold", 45);
-        hotBlock = new PmemBlock(MntPath.AEP_PATH+"hot", 15);
+        coolBlock = new PmemBlock(MntPath.AEP_PATH+"cold", StorageSize.COLD_SPACE_SIZE);
+        hotBlock = new PmemBlock(MntPath.AEP_PATH+"hot", StorageSize.HOT_SPACE_SIZE);
         scheduler = new Disk2AepScheduler(coolBlock, coldTopicQueueOffsetHandle);
     }
 
@@ -117,7 +119,7 @@ public class Manager {
 
         // 分阶段
         if (stage == 0) {  // 第一阶段
-            // 写aep
+            // 尝试写aep
             FutureTask<Long> writePMemFutureTask = new FutureTask<>(new Callable<Long>() {
                 @Override
                 public Long call() throws Exception {
@@ -137,7 +139,7 @@ public class Manager {
             try {
                 handle = writePMemFutureTask.get();
             } catch (Exception e) {
-                logger.error("Write aep future task: "+e.toString());
+                logger.error("Write aep future task get: "+e.toString());
                 return -1;
             }
 
@@ -150,11 +152,12 @@ public class Manager {
                     // 成功写入aep冷空间且队列信息未注册，一阶段全部视为冷队列
                     node = new PriorityListNode(topic, queueId);
                     scheduler.queuePriorityList.enterListHead(node);
+                    coldQueueMap.put(queueId, node);
                 }
                 // 更新队列信息
                 node.queueDataSize.addAndGet(data.capacity());
-                if (appendOffset > node.tailOffset.get()) {
-                    node.tailOffset.set(appendOffset);
+                if (appendOffset+1 > node.tailOffset.get()) {
+                    node.tailOffset.set(appendOffset+1);
                 }
             }
         } else {  // 第二阶段
@@ -190,66 +193,30 @@ public class Manager {
         // 阶段转换时需要做的一些操作，只做一次
         if (stage == 0) {
             stage = 1;
-            dramCache = new DRAMCache();
             scheduler.run();
         }
-
+        if (dramCache == null) {
+            dramCache = DRAMCache.createOrGetCache();
+        }
         // 返回结果
-        Map<Integer, ByteBuffer> dataMap = new HashMap<>();
+        Map<Integer, ByteBuffer> dataMap;
         ByteBuffer data;
         // 队列信息节点
         Map<Integer, PriorityListNode> coldQueueMap = getOrPutDefault(coldTopicQueueMap, topic, new ConcurrentHashMap<>());
         PriorityListNode node = coldQueueMap.getOrDefault(queueId, null);
 
         // TODO 队列分开处理
-        // 冷热队列区别对待 ---> (并发？)
         if (node == null) {  // 热队列
-            for(int i = 0; i < fetchNum; i++) {
-                data = dramCache.getAndRemove(topic+queueId, offset+i);
-                // 未缓存在dram中
-                if(data == null) {
-                    Long handle = getOrNull(getOrNull(getOrNull(hotTopicQueueOffsetHandle, topic),queueId),offset+i);
-                    if (handle == null) {  // aep 热空间无缓存，只能走磁盘
-                        // 寻找连续不在aep的offset
-                        int j;
-                        for(j = i+1; j < fetchNum;j ++) {
-                            handle = getOrNull(getOrNull(getOrNull(hotTopicQueueOffsetHandle, topic),queueId),offset+j);
-                            if (handle != null) break;
-                        }
-                        Map<Long, byte[]> map = ssdWriterReader.directRead(topic, queueId, offset+i, j-i);
-                        byteArrayMergeMap(dataMap, map, offset);
-                        // 恢复循环的正常进行
-                        i = j - 1;
-                        continue;
-                    } else {
-                        data = hotBlock.readData(handle);
-                        hotBlock.free(handle);
-                    }
-                }
-                dataMap.put(i, data);
-            }
+            dataMap = readHotQueueData(topic, queueId, offset, fetchNum);
         } else {  // 未验证或是冷队列
             if(node.isVerified == 0) {  // 未验证
                 node.isVerified = 1;
                 if(offset == 0) {  // 冷队列
-                    int i;
-                    for (i = 0; i < fetchNum; i++) {
-                        Long handle = getOrNull(getOrNull(getOrNull(coldTopicQueueOffsetHandle, topic),queueId),offset+i);
-                        if (handle != null) {
-                            data = coolBlock.readData(handle);
-                            dataMap.put((int) (offset+i), data);
-                        } else {
-                            break;
-                        }
-                    }
-                    // aep冷空间不再保存有，剩下都从disk获取
-                    if(i != fetchNum) {
-                        Map<Long, byte[]> map = ssdWriterReader.directRead(topic, queueId, offset+i, fetchNum-i);
-                        byteArrayMergeMap(dataMap, map, offset);
-                    }
+                    dataMap = readColdQueueData(topic, queueId, offset, fetchNum, node);
                 } else {  // 热队列，清除aep冷空间和当前queue的数据
                     // 清除优先队列中的节点
                     coldQueueMap.remove(queueId);
+                    scheduler.queuePriorityList.deList(node);
 
                     // 清除aep冷空间queue数据
                     Map<Integer, Map<Long, Long>> coldQueueOffsetHandle = coldTopicQueueOffsetHandle.get(topic);
@@ -258,47 +225,12 @@ public class Manager {
                     new Thread(new PMemCleaner(coldOffsetHandle.values().iterator())).start();
 
                     // 热队列读
-                    for(int i = 0; i < fetchNum; i++) {
-                        data = dramCache.getAndRemove(topic+queueId, offset+i);
-                        // 未缓存在dram中
-                        if(data == null) {
-                            Long handle = getOrNull(getOrNull(getOrNull(hotTopicQueueOffsetHandle, topic),queueId),offset+i);
-                            if (handle == null) {  // aep 热空间无缓存，只能走磁盘
-                                // 寻找连续不在aep的offset
-                                int j;
-                                for(j = i+1; j < fetchNum;j ++) {
-                                    handle = getOrNull(getOrNull(getOrNull(hotTopicQueueOffsetHandle, topic),queueId),offset+j);
-                                    if (handle != null) break;
-                                }
-                                Map<Long, byte[]> map = ssdWriterReader.directRead(topic, queueId, offset+i, j-i);
-                                byteArrayMergeMap(dataMap, map, offset);
-                                // 恢复循环的正常进行
-                                i = j - 1;
-                                continue;
-                            } else {
-                                data = hotBlock.readData(handle);
-                                hotBlock.free(handle);
-                            }
-                        }
-                        dataMap.put(i, data);
-                    }
+                    dataMap = readHotQueueData(topic, queueId, offset, fetchNum);
                 }
             } else {  // 冷队列
-                Map<Long, Long> coldOffsetHandle = getOrNull(getOrNull(coldTopicQueueOffsetHandle, topic), queueId);
-                int i;
-                for(i = 0; i < fetchNum; i++) {
-                    Long handle = coldOffsetHandle.get(offset+i);
-                    if (handle == null) {
-                        break;
-                    }
-                    data = coolBlock.readDataAndFree(handle);
-                    coldOffsetHandle.remove(offset+i);
-                }
-                Map<Long, byte[]> map = ssdWriterReader.directRead(topic, queueId, offset+i, fetchNum-i);
-                byteArrayMergeMap(dataMap, map, offset);
+                dataMap = readColdQueueData(topic, queueId, offset, fetchNum, node);
             }
         }
-
         return dataMap;
     }
 
@@ -311,6 +243,82 @@ public class Manager {
         return handle;
     }
 
+    /**
+     * 获取冷队列的数据，并负责处理在disk的读情况
+     * @param coldQueueNode - 冷队列的node，在确定了冷队列的前提下调用的方法*/
+    Map<Integer, ByteBuffer> readColdQueueData(String topic, int queueId, long offset, int fetchNum, PriorityListNode coldQueueNode) {
+        Map<Integer, ByteBuffer> dataMap = new HashMap<>();
+        ByteBuffer data;
+
+        Map<Long, Long> coldOffsetHandle = getOrNull(getOrNull(coldTopicQueueOffsetHandle, topic), queueId);
+
+        int i;
+        for(i = 0; i < fetchNum; i++) {
+            Long handle = coldOffsetHandle.get(offset+i);
+            if (handle == null) {
+                break;
+            }
+            // 从aep冷空间读取并移除消息
+            data = coolBlock.readDataAndFree(handle);
+            dataMap.put(i, data);
+            coldQueueNode.queueDataSize.addAndGet(-data.capacity());
+            coldOffsetHandle.remove(offset+i);
+
+        }
+        // 需要从ssd读
+        if (i != fetchNum) {
+            // 存在aep冷空间没有保存的数据，从ssd中取顺便做一些调整
+            Map<Long, byte[]> map = ssdWriterReader.directRead(topic, queueId, offset+i, fetchNum-i);
+            byteArrayMergeMap(dataMap, map, offset);
+            // 重新调整调度器的起点
+            coldQueueNode.tailOffset.set(offset+fetchNum+1);
+        }
+        // 冷队列信息节点加入队列head, 刚刚被消费过的队列增加调度的机会
+        scheduler.queuePriorityList.deList(coldQueueNode);
+        scheduler.queuePriorityList.enterListHead(coldQueueNode);
+        return dataMap;
+    }
+
+    /**
+     * 获取热队列的数据*/
+    Map<Integer, ByteBuffer> readHotQueueData(String topic, int queueId, long offset, int fetchNum) {
+        Map<Integer, ByteBuffer> dataMap = new HashMap<>();
+        ByteBuffer data;
+
+        for(int i = 0; i < fetchNum; i++) {
+            if (dramCache == null) {
+                logger.fatal("DRAM cache is null");
+                return null;
+            }
+
+            data = dramCache.getAndRemove(topic+queueId, offset+i);
+            // 未缓存在dram中
+            if(data == null) {
+                // 尝试在热aep中获得数据
+                Long handle = getOrNull(getOrNull(getOrNull(hotTopicQueueOffsetHandle, topic),queueId),offset+i);
+                if (handle == null) {  // aep 热空间无缓存，只能走磁盘
+                    // 寻找连续不在aep的offset
+                    int j;
+                    for(j = i+1; j < fetchNum;j++) {
+                        handle = getOrNull(getOrNull(getOrNull(hotTopicQueueOffsetHandle, topic),queueId),offset+j);
+                        if (handle != null) break;
+                    }
+                    Map<Long, byte[]> map = ssdWriterReader.directRead(topic, queueId, offset+i, j-i);
+                    byteArrayMergeMap(dataMap, map, offset);
+                    // 恢复循环的正常进行
+                    i = j - 1;
+                    continue;
+                } else {
+                    data = hotBlock.readDataAndFree(handle);
+                }
+            }
+            dataMap.put(i, data);
+        }
+        return dataMap;
+    }
+
+    /**
+     * 内部PMem数据清除类，第二阶段清除所有热队列在aep冷空间的数据*/
     class PMemCleaner implements Runnable{
         private Iterator<Long> handles;
         PMemCleaner(Iterator<Long> handles) {

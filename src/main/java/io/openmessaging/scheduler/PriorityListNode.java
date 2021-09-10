@@ -10,6 +10,7 @@ public class PriorityListNode {
     public PriorityListNode pre = null, next = null;
     // 并发
     public AtomicLong queueDataSize;
+    // 下一个不在aep中的offset
     public AtomicLong tailOffset;
     long availableTime;
     public volatile byte isVerified = 0;
@@ -19,5 +20,7 @@ public class PriorityListNode {
         this.topic = topic;
         this.queueId = queueId;
         availableTime = System.currentTimeMillis();
+        queueDataSize = new AtomicLong(0);
+        tailOffset = new AtomicLong(0);
     }
 }

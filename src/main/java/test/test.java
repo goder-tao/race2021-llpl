@@ -1,12 +1,6 @@
 package test;
 
-import java.io.RandomAccessFile;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Timer;
-import java.util.concurrent.ArrayBlockingQueue;
+import io.openmessaging.dramcache.DRAMCache;
 
 class Node {
     int i;
@@ -16,17 +10,45 @@ class Node {
 }
 
 class NodeTurn {
-    NodeTurn(Node node) {
-        node.i = 5;
+    private DRAMCache cache = null;
+    int flag = 0;
+    void initCache() {
+        if (flag == 0) {
+            flag = 1;
+            cache = DRAMCache.createOrGetCache();
+        }
+        if (cache == null) {
+            System.out.println("Cache is null");
+        }
     }
 }
 
+
+
 public class test {
     public static void main(String[] args) {
-        Map<Integer, Integer> map = new HashMap<>();
-        map.put(1,1);
-        Integer i = map.get(5);
-        System.out.println(i);
-
+        final NodeTurn nodeTurn = new NodeTurn();
+        Thread thread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                initCache(nodeTurn);
+            }
+        }), thread1 = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                initCache(nodeTurn);
+            }
+        });
+        try {
+            thread.start();
+            thread.join();
+        } catch (Exception e) {
+            System.out.println(e.toString());
+        }
+        System.out.println("waiting");
     }
+    static void initCache(NodeTurn node){
+        node.initCache();
+    }
+
 }
