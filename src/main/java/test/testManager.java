@@ -14,11 +14,7 @@ import java.util.Map;
 public class testManager {
     public static void main(String[] args) {
         Manager manager = new Manager();
-        testManager tester = new testManager();
-        tester.testSequentWrite(manager, "test", 0, 0, 40);
-        tester.testSequentWrite(manager, "test", 1, 0, 40);
-        System.out.println("----------------------------------------------------");
-        tester.testParallelRead(manager, "test", 0, 20, 40, "test", 1, 20 ,40);
+        testLatency(manager);
 
         System.out.println();
     }
@@ -145,6 +141,18 @@ public class testManager {
         } catch (Exception e) {
             System.out.println(e.toString());
         }
+    }
+
+    /**
+     * 测试append各部分时延*/
+    static void testLatency(Manager manager) {
+        for (int i = 0; i < 100; i++) {
+            ByteBuffer b = ByteBuffer.allocate((int) (StorageSize.KB*8));
+            manager.append("test", 0, b);
+        }
+        System.out.printf("Spend time summary - map time: %f%%, pmem io: %f%%, hdd io: %f%%\n",
+                (double)manager.sumMapTime.get()/ manager.sumAppendTime.get(), (double)manager.sumPMemIO.get()/manager.sumAppendTime.get(),
+                (double)manager.sumDiskIO.get()/manager.sumAppendTime.get());
     }
 
     /**

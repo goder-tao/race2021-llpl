@@ -23,6 +23,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class Manager {
     // aep冷空间和热空间
@@ -54,9 +55,16 @@ public class Manager {
         scheduler = new Disk2AepScheduler(coolBlock, coldTopicQueueOffsetHandle);
     }
 
+    public AtomicLong sumPMemIO = new AtomicLong(0), sumMapTime = new AtomicLong(0),
+            sumDiskIO = new AtomicLong(0), sumAppendTime = new AtomicLong(0);
+
     /**
      * 写方法*/
     public long append(String topic, int queueId, ByteBuffer data){
+        long sTime = System.nanoTime();
+        long pmemIOTIme = 0, mapTime, write2DiskTime;
+
+
         long appendOffset;
         long dataOffset;
         long indexOffsetC;
@@ -75,6 +83,9 @@ public class Manager {
         Map<String, Long> dataFilePartitionMap = getOrPutDefault(dataFileQueueMap, queueId, new ConcurrentHashMap<>());
         dataOffset = dataFilePartitionMap.getOrDefault(partitionPath, 0L);
         dataFilePartitionMap.put(partitionPath, dataOffset+data.capacity());
+
+        mapTime = System.nanoTime();
+
 //        try {
 //            writeLock.lock();
 //            // 互斥获取当前appendOffset
@@ -109,13 +120,12 @@ public class Manager {
 
         // 多线程双写, buffer并发不安全
         ByteBuffer b1 = ByteBufferUtil.copyFrom(data);
-        ByteBuffer b2 = ByteBufferUtil.copyFrom(data);
 
         // .index .data并发双写
         Thread writeSSDData = new Thread(new Runnable() {
             @Override
             public void run() {
-                int writeStatus = ssdWriterReader.write(MntPath.SSD_PATH+topic+"/"+queueId+"/", partitionPath+".data", dataOffset, b2);
+                int writeStatus = ssdWriterReader.write(MntPath.SSD_PATH+topic+"/"+queueId+"/", partitionPath+".data", dataOffset, data);
                 if (writeStatus == StatusCode.ERROR) {
                     logger.error("Manager write disk data fail, status code:" + writeStatus);
                 }
@@ -158,6 +168,8 @@ public class Manager {
                 return -1;
             }
 
+            pmemIOTIme = System.nanoTime();
+
             // 写入aep成功
             if (handle != -1) {
                 Map<Integer, Map<Long, Long>> queueOffsetHandle = getOrPutDefault(coldTopicQueueOffsetHandle, topic, new ConcurrentHashMap<>());
@@ -199,6 +211,19 @@ public class Manager {
             logger.error("Write SSD thread: "+e.toString());
             return -1L;
         }
+
+        write2DiskTime = System.nanoTime();
+
+        // System.out.println("Append spend time: "+(write2DiskTime-sTime)+"ns, map time: "+(mapTime-sTime)+"ns, pmem io time: "+(pmemIOTIme-mapTime)+"ns, disk io time: "+(write2DiskTime-mapTime)+"ns");
+        sumAppendTime.addAndGet(write2DiskTime-sTime);
+        sumMapTime.addAndGet(mapTime-sTime);
+        sumPMemIO.addAndGet(pmemIOTIme-mapTime);
+        sumDiskIO.addAndGet(write2DiskTime-mapTime);
+        System.out.printf("Append spend time: %dns, map time: %dns, pmem io time: %dns, disk io time: %dns\n" +
+                        "Spend time - map time: %f%%, pmem io: %f%%, hdd io: %f%%\n\n",
+                write2DiskTime-sTime, mapTime-sTime, pmemIOTIme-mapTime, write2DiskTime-mapTime,
+                (double)sumMapTime.get()/sumAppendTime.get(), (double)sumPMemIO.get()/sumAppendTime.get(),
+                (double)sumDiskIO.get()/sumAppendTime.get());
         return appendOffset;
     }
 
