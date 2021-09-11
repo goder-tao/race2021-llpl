@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Manager {
     // aep冷空间和热空间
@@ -45,7 +46,7 @@ public class Manager {
     private final Lock writeLock = new Lock();
     // memory cache
     private volatile DRAMCache dramCache;
-    private int stage = 0;
+    private AtomicBoolean isStageChanged = new AtomicBoolean(false);
 
     public Manager() {
         coolBlock = new PmemBlock(MntPath.AEP_PATH+"cold", StorageSize.COLD_SPACE_SIZE);
@@ -118,7 +119,7 @@ public class Manager {
         writeSSDIndex.start();
 
         // 分阶段
-        if (stage == 0) {  // 第一阶段
+        if (!isStageChanged.get()) {  // 第一阶段
             // 尝试写aep
             FutureTask<Long> writePMemFutureTask = new FutureTask<>(new Callable<Long>() {
                 @Override
@@ -191,13 +192,14 @@ public class Manager {
      * 读方法实现*/
     public Map<Integer, ByteBuffer> getRange(String topic, int queueId, long offset, int fetchNum) {
         // 阶段转换时需要做的一些操作，只做一次
-        if (stage == 0) {
-            stage = 1;
+        if (!isStageChanged.get()) {
+            isStageChanged.set(true);
+            isStageChanged.set(true);
             scheduler.run();
         }
-        if (dramCache == null) {
-            dramCache = DRAMCache.createOrGetCache();
-        }
+
+        dramCache = DRAMCache.createOrGetCache();
+
         // 返回结果
         Map<Integer, ByteBuffer> dataMap;
         ByteBuffer data;
