@@ -61,29 +61,42 @@ public class Manager {
         long dataOffset;
         long indexOffsetC;
         String partitionPath;
-        try {
-            writeLock.lock();
-            // 互斥获取当前appendOffset
-            Map<Integer, Long> queueOffset;
-            queueOffset = getOrPutDefault(topicQueueOffset, topic, new ConcurrentHashMap<>());
-            appendOffset = queueOffset.getOrDefault(queueId, 0L);
-            queueOffset.put(queueId, appendOffset+1);
-            // 确定分区
-            int partition = (int) (appendOffset / DataFileBasicInfo.ITEM_NUM);
-            indexOffsetC = appendOffset % DataFileBasicInfo.ITEM_NUM;
-            partitionPath = PartitionMaker.makePartitionPath(partition, DataFileBasicInfo.FILE_NAME_LENGTH, DataFileBasicInfo.ITEM_NUM);
-            // .data文件当前offset
-            Map<Integer, Map<String, Long>> dataFileQueueMap = getOrPutDefault(dataFileOffset, topic, new ConcurrentHashMap<>());
-            Map<String, Long> dataFilePartitionMap = getOrPutDefault(dataFileQueueMap, queueId, new ConcurrentHashMap<>());
-            dataOffset = dataFilePartitionMap.getOrDefault(partitionPath, 0L);
-            dataFilePartitionMap.put(partitionPath, dataOffset+data.capacity());
-            writeLock.unlock();
-        } catch (Exception e) {
-            logger.error("Append writeLock: "+e.toString());
-            return -1L;
-        }finally {
-            writeLock.unlock();
-        }
+        Map<Integer, Long> queueOffset;
+        queueOffset = getOrPutDefault(topicQueueOffset, topic, new ConcurrentHashMap<>());
+        appendOffset = queueOffset.getOrDefault(queueId, 0L);
+        queueOffset.put(queueId, appendOffset+1);
+        // 确定分区
+        int partition = (int) (appendOffset / DataFileBasicInfo.ITEM_NUM);
+        indexOffsetC = appendOffset % DataFileBasicInfo.ITEM_NUM;
+        partitionPath = PartitionMaker.makePartitionPath(partition, DataFileBasicInfo.FILE_NAME_LENGTH, DataFileBasicInfo.ITEM_NUM);
+        // .data文件当前offset
+        Map<Integer, Map<String, Long>> dataFileQueueMap = getOrPutDefault(dataFileOffset, topic, new ConcurrentHashMap<>());
+        Map<String, Long> dataFilePartitionMap = getOrPutDefault(dataFileQueueMap, queueId, new ConcurrentHashMap<>());
+        dataOffset = dataFilePartitionMap.getOrDefault(partitionPath, 0L);
+        dataFilePartitionMap.put(partitionPath, dataOffset+data.capacity());
+//        try {
+//            writeLock.lock();
+//            // 互斥获取当前appendOffset
+//            Map<Integer, Long> queueOffset;
+//            queueOffset = getOrPutDefault(topicQueueOffset, topic, new ConcurrentHashMap<>());
+//            appendOffset = queueOffset.getOrDefault(queueId, 0L);
+//            queueOffset.put(queueId, appendOffset+1);
+//            // 确定分区
+//            int partition = (int) (appendOffset / DataFileBasicInfo.ITEM_NUM);
+//            indexOffsetC = appendOffset % DataFileBasicInfo.ITEM_NUM;
+//            partitionPath = PartitionMaker.makePartitionPath(partition, DataFileBasicInfo.FILE_NAME_LENGTH, DataFileBasicInfo.ITEM_NUM);
+//            // .data文件当前offset
+//            Map<Integer, Map<String, Long>> dataFileQueueMap = getOrPutDefault(dataFileOffset, topic, new ConcurrentHashMap<>());
+//            Map<String, Long> dataFilePartitionMap = getOrPutDefault(dataFileQueueMap, queueId, new ConcurrentHashMap<>());
+//            dataOffset = dataFilePartitionMap.getOrDefault(partitionPath, 0L);
+//            dataFilePartitionMap.put(partitionPath, dataOffset+data.capacity());
+//            writeLock.unlock();
+//        } catch (Exception e) {
+//            logger.error("Append writeLock: "+e.toString());
+//            return -1L;
+//        }finally {
+//            writeLock.unlock();
+//        }
 
         Map<Integer, PriorityListNode> coldQueueMap = getOrPutDefault(coldTopicQueueMap, topic, new ConcurrentHashMap<>());
         PriorityListNode node = coldQueueMap.getOrDefault(queueId, null);
@@ -95,13 +108,13 @@ public class Manager {
 
         // 多线程双写, buffer并发不安全
         ByteBuffer b1 = ByteBufferUtil.copyFrom(data);
-        ByteBuffer b2 = ByteBufferUtil.copyFrom(data);
+
 
         // .index .data并发双写
         Thread writeSSDData = new Thread(new Runnable() {
             @Override
             public void run() {
-                int writeStatus = ssdWriterReader.write(MntPath.SSD_PATH+topic+"/"+queueId+"/", partitionPath+".data", dataOffset, b2);
+                int writeStatus = ssdWriterReader.write(MntPath.SSD_PATH+topic+"/"+queueId+"/", partitionPath+".data", dataOffset, data);
                 if (writeStatus == StatusCode.ERROR) {
                     logger.error("Manager write disk data fail, status code:" + writeStatus);
                 }

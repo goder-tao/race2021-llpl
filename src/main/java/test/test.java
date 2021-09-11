@@ -2,6 +2,8 @@ package test;
 
 import io.openmessaging.dramcache.DRAMCache;
 
+import java.io.File;
+
 class Node {
     int i;
     Node(int i) {
@@ -27,28 +29,27 @@ class NodeTurn {
 
 public class test {
     public static void main(String[] args) {
-        final NodeTurn nodeTurn = new NodeTurn();
-        Thread thread = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                initCache(nodeTurn);
-            }
-        }), thread1 = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                initCache(nodeTurn);
-            }
-        });
-        try {
-            thread.start();
-            thread.join();
-        } catch (Exception e) {
-            System.out.println(e.toString());
-        }
-        System.out.println("waiting");
+       parallelDir();
     }
     static void initCache(NodeTurn node){
         node.initCache();
     }
 
+    static void parallelDir() {
+        for(int i = 0; i < 100; i++) {
+            Thread thread = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    File f = new File("/home/tao/Data/sim_SSD/test2");
+                    if (!f.exists()) {
+                        boolean b = f.mkdirs();
+                        if (!b) {
+                            System.out.println("Create dir fail!!");
+                        }
+                    }
+                }
+            });
+            thread.start();
+        }
+    }
 }
