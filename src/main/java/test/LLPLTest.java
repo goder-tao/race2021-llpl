@@ -2,8 +2,7 @@ package test;
 
 import com.intel.pmem.llpl.Heap;
 import com.intel.pmem.llpl.MemoryBlock;
-import org.junit.Assert;
-import org.junit.Test;
+
 
 /**
  * @author http://wesleyone.github.io/
@@ -62,7 +61,6 @@ public class LLPLTest {
         return msg;
     }
 
-    @Test
     public void main0 () {
         String option = "0";
         byte[] input;
