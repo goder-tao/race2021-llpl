@@ -1,5 +1,7 @@
 package test;
 
+import com.intel.pmem.llpl.Heap;
+import com.intel.pmem.llpl.MemoryBlock;
 import io.openmessaging.aep.util.PmemBlock;
 import io.openmessaging.constant.MntPath;
 import io.openmessaging.constant.StorageSize;
@@ -7,6 +9,9 @@ import io.openmessaging.dramcache.DRAMCache;
 import io.openmessaging.manager.Manager;
 import io.openmessaging.util.SystemMemory;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
@@ -14,9 +19,9 @@ import java.util.Map;
 public class testManager {
     public static void main(String[] args) {
         Manager manager = new Manager();
-        testLatency(manager);
-
-        System.out.println();
+        testSequentWrite(manager, "test", 0, 0, 40);
+        testSequentWrite(manager, "test", 1, 0, 40);
+        testParallelRead(manager, "test", 0, 0, 40, "test", 1, 20, 40);
     }
 
     /**
@@ -141,30 +146,6 @@ public class testManager {
         } catch (Exception e) {
             System.out.println(e.toString());
         }
-    }
-
-    /**
-     * 测试append各部分时延*/
-    static void testLatency(Manager manager) {
-        for (int i = 0; i < 100; i++) {
-            ByteBuffer b = ByteBuffer.allocate((int) (StorageSize.KB*8));
-            manager.append("test", 0, b);
-        }
-        System.out.printf("Spend time summary - map time: %f%%, pmem io: %f%%, hdd io: %f%%\n",
-                (double)manager.sumMapTime.get()/ manager.sumAppendTime.get(), (double)manager.sumPMemIO.get()/manager.sumAppendTime.get(),
-                (double)manager.sumDiskIO.get()/manager.sumAppendTime.get());
-    }
-
-    /**
-     * 测试并行读写延时开两个不同的线程一个进行append工作一个进行getRange*/
-    static void testParallelWriteAndRead(Manager manager, String topic, int qid, int s, int e) {
-
-    }
-
-    /**
-     * 测试调度群scheduler*/
-    static void testScheduler() {
-
     }
 
 }

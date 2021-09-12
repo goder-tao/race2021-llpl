@@ -1,5 +1,7 @@
 package io.openmessaging.scheduler;
 
+import io.openmessaging.aep.mmu.MemoryListNode;
+import io.openmessaging.aep.util.PMemSpace;
 import io.openmessaging.aep.util.PmemBlock;
 import io.openmessaging.ssd.SSDWriterReader;
 import org.apache.log4j.LogManager;
@@ -18,16 +20,18 @@ import java.util.concurrent.ConcurrentHashMap;
 public class Disk2AepScheduler {
     public final QueuePriorityList queuePriorityList = new QueuePriorityList();
     private final SSDWriterReader ssdWriterReader = new SSDWriterReader();;
-    private final PmemBlock pmemBlock;
+    private final PMemSpace pmemBlock;
     private boolean isWork = false;
     // 保存在aep中的handle
-    private final ConcurrentHashMap<String, Map<Integer, Map<Long, Long>>> topicQueueOffsetHandle;
+    private final ConcurrentHashMap<String, Map<Integer, Map<Long, MemoryListNode>>> topicQueueOffsetHandle;
     private final Logger logger = LogManager.getLogger(Disk2AepScheduler.class.getName());
     // 单例线程锁
     private Lock lock = new Lock();
     // 单例线程只开一次
     private Thread thread = null;
-    public Disk2AepScheduler(PmemBlock pmemBlock, ConcurrentHashMap<String, Map<Integer, Map<Long, Long>>> topicQueueOffsetHandle) {
+    // 直接一次性预调度100数据
+    private final int fetchNum = 100;
+    public Disk2AepScheduler(PMemSpace pmemBlock, ConcurrentHashMap<String, Map<Integer, Map<Long, MemoryListNode>>> topicQueueOffsetHandle) {
         this.pmemBlock = pmemBlock;
         this.topicQueueOffsetHandle = topicQueueOffsetHandle;
     }
@@ -83,16 +87,14 @@ public class Disk2AepScheduler {
         public void run() {
             // 数据调度
             long tailOffset = move.tailOffset.get();
-            // 直接一次性预调度100数据
-            int fetchNum = 100;
             Map<Long, byte[]> offsetDataMap = ssdWriterReader.directRead(move.topic, move.queueId, tailOffset, fetchNum);
-            Map<Integer, Map<Long, Long>> queueOffsetHandle = getOrPutDefault(topicQueueOffsetHandle, move.topic, new ConcurrentHashMap<>());
-            Map<Long, Long> offsetHandle = getOrPutDefault(queueOffsetHandle, move.queueId, new ConcurrentHashMap<>());
+            Map<Integer, Map<Long, MemoryListNode>> queueOffsetHandle = getOrPutDefault(topicQueueOffsetHandle, move.topic, new ConcurrentHashMap<>());
+            Map<Long, MemoryListNode> offsetHandle = getOrPutDefault(queueOffsetHandle, move.queueId, new ConcurrentHashMap<>());
             // 尝试调度入aep
             for (long offset:offsetDataMap.keySet()) {
                 byte[] b = offsetDataMap.get(offset);
-                long handle = pmemBlock.write(b);
-                if(handle > 0) {  // 分配空间成功，保存
+                MemoryListNode handle = pmemBlock.write(b);
+                if(handle != null) {  // 分配空间成功，保存
                     offsetHandle.put(offset, handle);
                 } else {  // 分配空间失败，空间不足，修改tailOffset,退出
                     logger.info("Aep full, queue scheduling exist");

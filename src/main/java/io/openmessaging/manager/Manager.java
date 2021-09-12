@@ -1,6 +1,7 @@
 package io.openmessaging.manager;
 
-import io.openmessaging.aep.util.PmemBlock;
+import io.openmessaging.aep.mmu.MemoryListNode;
+import io.openmessaging.aep.util.PMemSpace;
 import io.openmessaging.constant.DataFileBasicInfo;
 import io.openmessaging.constant.MntPath;
 import io.openmessaging.constant.StatusCode;
@@ -27,8 +28,8 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class Manager {
     // aep冷空间和热空间
-    private final PmemBlock coolBlock;
-    private final PmemBlock hotBlock;
+    private final PMemSpace coolBlock;
+    private final PMemSpace hotBlock;
     private final Logger logger = LogManager.getLogger(Manager.class.getName());
     private final SSDWriterReader ssdWriterReader = new SSDWriterReader();
     // 保存每个冷queue在aep冷空间的最后一个offset值
@@ -38,9 +39,9 @@ public class Manager {
     // 分配给当前queue数据的.data文件偏移量
     private final ConcurrentHashMap<String, Map<Integer, Map<String, Long>>> dataFileOffset = new ConcurrentHashMap<>();
     // 保存在cold aep中的handle
-    private final ConcurrentHashMap<String, Map<Integer, Map<Long, Long>>> coldTopicQueueOffsetHandle = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Map<Integer, Map<Long, MemoryListNode>>> coldTopicQueueOffsetHandle = new ConcurrentHashMap<>();
     // hot space handle
-    private final ConcurrentHashMap<String, Map<Integer, Map<Long, Long>>> hotTopicQueueOffsetHandle = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Map<Integer, Map<Long, MemoryListNode>>> hotTopicQueueOffsetHandle = new ConcurrentHashMap<>();
     // scheduler
     private final Disk2AepScheduler scheduler;
     // lock definition
@@ -50,8 +51,8 @@ public class Manager {
     private AtomicBoolean isStageChanged = new AtomicBoolean(false);
 
     public Manager() {
-        coolBlock = new PmemBlock(MntPath.AEP_PATH+"cold", StorageSize.COLD_SPACE_SIZE);
-        hotBlock = new PmemBlock(MntPath.AEP_PATH+"hot", StorageSize.HOT_SPACE_SIZE);
+        coolBlock = new PMemSpace(MntPath.AEP_PATH+"cold", StorageSize.COLD_SPACE_SIZE);
+        hotBlock = new PMemSpace(MntPath.AEP_PATH+"hot", StorageSize.HOT_SPACE_SIZE);
         scheduler = new Disk2AepScheduler(coolBlock, coldTopicQueueOffsetHandle);
     }
 
@@ -62,8 +63,7 @@ public class Manager {
      * 写方法*/
     public long append(String topic, int queueId, ByteBuffer data){
         long sTime = System.nanoTime();
-        long pmemIOTIme = 0, mapTime, write2DiskTime;
-
+//        long pmemIOTIme = 0, mapTime, write2DiskTime;
 
         long appendOffset;
         long dataOffset;
@@ -84,7 +84,7 @@ public class Manager {
         dataOffset = dataFilePartitionMap.getOrDefault(partitionPath, 0L);
         dataFilePartitionMap.put(partitionPath, dataOffset+data.capacity());
 
-        mapTime = System.nanoTime();
+//        mapTime = System.nanoTime();
 
 //        try {
 //            writeLock.lock();
@@ -142,12 +142,14 @@ public class Manager {
         writeSSDData.start();
         writeSSDIndex.start();
 
+//        write2DiskTime = System.nanoTime();
+
         // 分阶段
         if (!isStageChanged.get()) {  // 第一阶段
             // 尝试写aep
-            FutureTask<Long> writePMemFutureTask = new FutureTask<>(new Callable<Long>() {
+            FutureTask<MemoryListNode> writePMemFutureTask = new FutureTask<>(new Callable<MemoryListNode>() {
                 @Override
-                public Long call() throws Exception {
+                public MemoryListNode call() throws Exception {
                     return writePMemOnly(coolBlock, topic, queueId, b1);
                 }
             });
@@ -160,21 +162,21 @@ public class Manager {
             }
 
             // 尝试获取写入ape的handle
-            long handle;
+            MemoryListNode memoryListNode;
             try {
-                handle = writePMemFutureTask.get();
+                memoryListNode = writePMemFutureTask.get();
             } catch (Exception e) {
                 logger.error("Write aep future task get: "+e.toString());
                 return -1;
             }
 
-            pmemIOTIme = System.nanoTime();
+//            pmemIOTIme = System.nanoTime();
 
             // 写入aep成功
-            if (handle != -1) {
-                Map<Integer, Map<Long, Long>> queueOffsetHandle = getOrPutDefault(coldTopicQueueOffsetHandle, topic, new ConcurrentHashMap<>());
-                Map<Long, Long> offsetHandle = getOrPutDefault(queueOffsetHandle, queueId, new ConcurrentHashMap<>());
-                offsetHandle.put(appendOffset, handle);
+            if (memoryListNode != null) {
+                Map<Integer, Map<Long, MemoryListNode>> queueOffsetHandle = getOrPutDefault(coldTopicQueueOffsetHandle, topic, new ConcurrentHashMap<>());
+                Map<Long, MemoryListNode> offsetHandle = getOrPutDefault(queueOffsetHandle, queueId, new ConcurrentHashMap<>());
+                offsetHandle.put(appendOffset, memoryListNode);
                 if (node == null) {
                     // 成功写入aep冷空间且队列信息未注册，一阶段全部视为冷队列
                     node = new PriorityListNode(topic, queueId);
@@ -193,16 +195,27 @@ public class Manager {
                 if(dramCache.isCacheAvailable()) {  // 缓存在dram
                     dramCache.put(topic+queueId, appendOffset, data);
                 } else {  // 缓存在aep
-                    long handle = writePMemOnly(hotBlock, topic, queueId, data);
+                    MemoryListNode memoryListNode = writePMemOnly(hotBlock, topic, queueId, data);
                     // 写入aep成功
-                    if (handle != -1) {
-                        Map<Integer, Map<Long, Long>> queueOffsetHandle = getOrPutDefault(hotTopicQueueOffsetHandle, topic, new ConcurrentHashMap<>());
-                        Map<Long, Long> offsetHandle = getOrPutDefault(queueOffsetHandle, queueId, new ConcurrentHashMap<>());
-                        offsetHandle.put(appendOffset, handle);
+                    if (memoryListNode != null) {
+                        Map<Integer, Map<Long, MemoryListNode>> queueOffsetHandle = getOrPutDefault(hotTopicQueueOffsetHandle, topic, new ConcurrentHashMap<>());
+                        Map<Long, MemoryListNode> offsetHandle = getOrPutDefault(queueOffsetHandle, queueId, new ConcurrentHashMap<>());
+                        offsetHandle.put(appendOffset, memoryListNode);
                     }
                 }
             }
         }
+
+//        // System.out.println("Append spend time: "+(write2DiskTime-sTime)+"ns, map time: "+(mapTime-sTime)+"ns, pmem io time: "+(pmemIOTIme-mapTime)+"ns, disk io time: "+(write2DiskTime-mapTime)+"ns");
+//        sumAppendTime.addAndGet(pmemIOTIme-sTime);
+//        sumMapTime.addAndGet(mapTime-sTime);
+//        sumPMemIO.addAndGet(pmemIOTIme-write2DiskTime);
+//        sumDiskIO.addAndGet(write2DiskTime-mapTime);
+//        System.out.printf("Append spend time: %dns, map time: %dns, pmem io time: %dns, disk io time: %dns\n" +
+//                        "Spend time - map time: %f%%, pmem io: %f%%, hdd io: %f%%\n\n",
+//                pmemIOTIme-sTime, mapTime-sTime, pmemIOTIme-write2DiskTime, write2DiskTime-mapTime,
+//                (double)sumMapTime.get()/sumAppendTime.get(), (double)sumPMemIO.get()/sumAppendTime.get(),
+//                (double)sumDiskIO.get()/sumAppendTime.get());
 
         try {
             writeSSDData.join();
@@ -211,19 +224,6 @@ public class Manager {
             logger.error("Write SSD thread: "+e.toString());
             return -1L;
         }
-
-        write2DiskTime = System.nanoTime();
-
-        // System.out.println("Append spend time: "+(write2DiskTime-sTime)+"ns, map time: "+(mapTime-sTime)+"ns, pmem io time: "+(pmemIOTIme-mapTime)+"ns, disk io time: "+(write2DiskTime-mapTime)+"ns");
-        sumAppendTime.addAndGet(write2DiskTime-sTime);
-        sumMapTime.addAndGet(mapTime-sTime);
-        sumPMemIO.addAndGet(pmemIOTIme-mapTime);
-        sumDiskIO.addAndGet(write2DiskTime-mapTime);
-        System.out.printf("Append spend time: %dns, map time: %dns, pmem io time: %dns, disk io time: %dns\n" +
-                        "Spend time - map time: %f%%, pmem io: %f%%, hdd io: %f%%\n\n",
-                write2DiskTime-sTime, mapTime-sTime, pmemIOTIme-mapTime, write2DiskTime-mapTime,
-                (double)sumMapTime.get()/sumAppendTime.get(), (double)sumPMemIO.get()/sumAppendTime.get(),
-                (double)sumDiskIO.get()/sumAppendTime.get());
         return appendOffset;
     }
 
@@ -260,8 +260,8 @@ public class Manager {
                     scheduler.queuePriorityList.deList(node);
 
                     // 清除aep冷空间queue数据
-                    Map<Integer, Map<Long, Long>> coldQueueOffsetHandle = coldTopicQueueOffsetHandle.get(topic);
-                    Map<Long, Long> coldOffsetHandle = coldQueueOffsetHandle.get(queueId);
+                    Map<Integer, Map<Long, MemoryListNode>> coldQueueOffsetHandle = coldTopicQueueOffsetHandle.get(topic);
+                    Map<Long, MemoryListNode> coldOffsetHandle = coldQueueOffsetHandle.get(queueId);
                     coldQueueOffsetHandle.remove(queueId);
                     new Thread(new PMemCleaner(coldOffsetHandle.values().iterator())).start();
 
@@ -278,10 +278,8 @@ public class Manager {
     /**
      * 完成只写aep的工作
      * @return: handle of allocated MemoryBlock*/
-    long writePMemOnly(PmemBlock space, String topic, int queueId, ByteBuffer data) {
-        long handle;
-        handle = space.writeData(data);
-        return handle;
+    MemoryListNode writePMemOnly(PMemSpace space, String topic, int queueId, ByteBuffer data) {
+        return space.write(data.array());
     }
 
     /**
@@ -291,11 +289,12 @@ public class Manager {
         Map<Integer, ByteBuffer> dataMap = new HashMap<>();
         ByteBuffer data;
 
-        Map<Long, Long> coldOffsetHandle = getOrNull(getOrNull(coldTopicQueueOffsetHandle, topic), queueId);
+
+        Map<Long, MemoryListNode> coldOffsetHandle = getOrNull(getOrNull(coldTopicQueueOffsetHandle, topic), queueId);
 
         int i;
         for(i = 0; i < fetchNum; i++) {
-            Long handle = coldOffsetHandle.get(offset+i);
+            MemoryListNode handle = coldOffsetHandle.get(offset+i);
             if (handle == null) {
                 break;
             }
@@ -336,7 +335,7 @@ public class Manager {
             // 未缓存在dram中
             if(data == null) {
                 // 尝试在热aep中获得数据
-                Long handle = getOrNull(getOrNull(getOrNull(hotTopicQueueOffsetHandle, topic),queueId),offset+i);
+                MemoryListNode handle = getOrNull(getOrNull(getOrNull(hotTopicQueueOffsetHandle, topic),queueId),offset+i);
                 if (handle == null) {  // aep 热空间无缓存，只能走磁盘
                     // 寻找连续不在aep的offset
                     int j;
@@ -361,14 +360,14 @@ public class Manager {
     /**
      * 内部PMem数据清除类，第二阶段清除所有热队列在aep冷空间的数据*/
     class PMemCleaner implements Runnable{
-        private Iterator<Long> handles;
-        PMemCleaner(Iterator<Long> handles) {
+        private Iterator<MemoryListNode> handles;
+        PMemCleaner(Iterator<MemoryListNode> handles) {
             this.handles = handles;
         }
         @Override
         public void run() {
            while (handles.hasNext()) {
-               long handle = handles.next();
+               MemoryListNode handle = handles.next();
                coolBlock.free(handle);
            }
         }
