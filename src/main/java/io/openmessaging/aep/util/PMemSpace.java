@@ -23,7 +23,7 @@ public class PMemSpace implements Space {
     public PMemSpace(String path, long size) {
         boolean initialized = Heap.exists(path);
         heap = initialized ? Heap.openHeap(path) : Heap.createHeap(path, size);
-        mainBlock = heap.allocateMemoryBlock(size-5*StorageSize.MB);
+        mainBlock = heap.allocateMemoryBlock(size-10*StorageSize.MB);
         mmu = new PMemMMU2(mainBlock.size());
         readerWriter = new PMemReaderWriter(mainBlock);
         this.size = mainBlock.size();

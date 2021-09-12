@@ -9,7 +9,6 @@ public class StorageSize {
 
     public static final long COLD_SPACE_SIZE = 45*GB;
     public static final long HOT_SPACE_SIZE = 15*GB;
-
-//    public static final long COLD_SPACE_SIZE = 80*MB;
+//    public static final long COLD_SPACE_SIZE = 80*GB;
 //    public static final long HOT_SPACE_SIZE = 40*MB;
 }

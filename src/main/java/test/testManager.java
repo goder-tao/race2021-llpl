@@ -1,43 +1,30 @@
 package test;
 
-import com.intel.pmem.llpl.Heap;
-import com.intel.pmem.llpl.MemoryBlock;
-import io.openmessaging.aep.util.PmemBlock;
+import io.openmessaging.aep.util.PMemSpace;
 import io.openmessaging.constant.MntPath;
 import io.openmessaging.constant.StorageSize;
 import io.openmessaging.dramcache.DRAMCache;
 import io.openmessaging.manager.Manager;
 import io.openmessaging.util.SystemMemory;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 
 public class testManager {
     public static void main(String[] args) {
-        Manager manager = new Manager();
-        testSequentWrite(manager, "test", 0, 0, 40);
-        testSequentWrite(manager, "test", 1, 0, 40);
-        testParallelRead(manager, "test", 0, 0, 40, "test", 1, 20, 40);
+        testBlock();
     }
 
     /**
      * 测试PMemBlock(yes)*/
     static void testBlock() {
-        PmemBlock block = new PmemBlock(MntPath.AEP_PATH+"test", 16* StorageSize.MB);
+        PMemSpace block = new PMemSpace(MntPath.AEP_PATH+"test", StorageSize.COLD_SPACE_SIZE);
         Map<Integer, Long> mapData = new HashMap<>();
         for (int i = 0; i < 20; i++) {
             ByteBuffer data = ByteBuffer.allocate(4);
             data.putInt(i);
-            long handle = block.writeData(data);
-            mapData.put(i, handle);
-        }
-        for (int key:mapData.keySet()) {
-            ByteBuffer data = block.readData(mapData.get(key));
-            System.out.println(key+" : "+data.getInt());
+            block.write(data.array());
         }
     }
 
