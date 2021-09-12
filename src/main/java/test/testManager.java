@@ -1,5 +1,7 @@
 package test;
 
+import com.intel.pmem.llpl.Heap;
+import com.intel.pmem.llpl.MemoryBlock;
 import io.openmessaging.aep.util.PmemBlock;
 import io.openmessaging.constant.MntPath;
 import io.openmessaging.constant.StorageSize;
@@ -7,6 +9,9 @@ import io.openmessaging.dramcache.DRAMCache;
 import io.openmessaging.manager.Manager;
 import io.openmessaging.util.SystemMemory;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
@@ -14,13 +19,9 @@ import java.util.Map;
 public class testManager {
     public static void main(String[] args) {
         Manager manager = new Manager();
-        testManager tester = new testManager();
-        tester.testSequentWrite(manager, "test", 0, 0, 40);
-        tester.testSequentWrite(manager, "test", 1, 0, 40);
-        System.out.println("----------------------------------------------------");
-        tester.testParallelRead(manager, "test", 0, 20, 40, "test", 1, 20 ,40);
-
-        System.out.println();
+        testSequentWrite(manager, "test", 0, 0, 40);
+        testSequentWrite(manager, "test", 1, 0, 40);
+        testParallelRead(manager, "test", 0, 0, 40, "test", 1, 20, 40);
     }
 
     /**
@@ -145,18 +146,6 @@ public class testManager {
         } catch (Exception e) {
             System.out.println(e.toString());
         }
-    }
-
-    /**
-     * 测试并行读写延时开两个不同的线程一个进行append工作一个进行getRange*/
-    static void testParallelWriteAndRead(Manager manager, String topic, int qid, int s, int e) {
-
-    }
-
-    /**
-     * 测试调度群scheduler*/
-    static void testScheduler() {
-
     }
 
 }

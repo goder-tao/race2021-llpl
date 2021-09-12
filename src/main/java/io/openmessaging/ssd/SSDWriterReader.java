@@ -3,11 +3,14 @@ package io.openmessaging.ssd;
 import io.openmessaging.constant.DataFileBasicInfo;
 import io.openmessaging.constant.MntPath;
 import io.openmessaging.constant.StatusCode;
+import io.openmessaging.constant.StorageSize;
 import io.openmessaging.util.PartitionMaker;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -41,49 +44,50 @@ public class SSDWriterReader implements DiskReader, DiskWriter {
         return data;
     }
 
+    //
     @Override
     public int append(String dirPath, String fileName, ByteBuffer buffer) {
-        try {
-            File f = new File(dirPath);
-            if (!f.exists()) {
-                boolean b = f.mkdirs();
-                if (!b) {
-                    logger.error("Create dir fail!!");
-                }
-            }
-            RandomAccessFile file = new RandomAccessFile(dirPath + fileName, "rw");
-
-            buffer.rewind();
-            FileChannel channel = file.getChannel();
-            ByteBuffer puter = channel.map(FileChannel.MapMode.READ_WRITE, file.length(), buffer.capacity());
-            puter.put(buffer);
-            channel.close();
-            file.close();
-        } catch (Exception e) {
-            logger.error("Write to disk fail, " + e.toString());
-            return StatusCode.ERROR;
-        }
+//        try {
+//            File f = new File(dirPath);
+//            if (!f.exists()) {
+//                boolean b = f.mkdirs();
+//                if (!b) {
+//                    logger.error("Create dir fail!!");
+//                }
+//            }
+//            RandomAccessFile file = new RandomAccessFile(dirPath + fileName, "rw");
+//
+//            byte b[] = buffer.array();
+//
+//            buffer.rewind();
+//            FileChannel channel = file.getChannel();
+//            ByteBuffer puter = channel.map(FileChannel.MapMode.READ_WRITE, file.length(), buffer.capacity());
+//            puter.put(buffer);
+//            channel.close();
+//            file.close();
+//        } catch (Exception e) {
+//            logger.error("Write to disk fail, " + e.toString());
+//            return StatusCode.ERROR;
+//        }
         return StatusCode.SUCCESS;
     }
 
     @Override
     public int write(String dirPath, String fileName, long offset, ByteBuffer buffer) {
         try {
-            File f = new File(dirPath);
-            if (!f.exists()) {
-                boolean b = f.mkdirs();
+            File dir = new File(dirPath);
+            if (!dir.exists()) {
+                boolean b = dir.mkdirs();
                 if (!b) {
                     logger.error("Create dir fail!!");
                 }
             }
             RandomAccessFile file = new RandomAccessFile(dirPath + fileName, "rw");
-            //file.seek(offset);
 
-            buffer.rewind();
-            FileChannel channel = file.getChannel();
-            ByteBuffer puter = channel.map(FileChannel.MapMode.READ_WRITE, offset, buffer.capacity());
-            puter.put(buffer);
-            channel.close();
+            byte[] b = buffer.array();
+            file.seek(offset);
+            file.write(b);
+
             file.close();
         } catch (Exception e) {
             logger.error("Write to disk fail, " + e.toString());
@@ -127,8 +131,31 @@ public class SSDWriterReader implements DiskReader, DiskWriter {
         return map;
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
         SSDWriterReader ssdWriterReader = new SSDWriterReader();
-        ssdWriterReader.read("/home/tao/Data/Software/project/java/mq-sample/a.txt", 5,5);
+        int T = 10000;
+        long sumTime = 0;
+        ByteBuffer buffer = ByteBuffer.allocate((int) (StorageSize.KB*8));
+        byte[] b = new byte[(int) (StorageSize.KB*8)];
+
+        RandomAccessFile file;
+        for (int i = 0; i < T; i++) {
+            long t = System.nanoTime();
+            file = new RandomAccessFile("/home/tao/Data/test", "rw");
+            file.seek(i*b.length);
+            file.write(buffer.array());
+            file.close();
+
+            sumTime += System.nanoTime()-t;
+            System.out.println("Write time: "+(System.nanoTime()-t)+"ns");
+        }
+
+        for (int i = 0; i < T; i++) {
+            long t = System.nanoTime();
+            ssdWriterReader.write("/home/tao/Data/", "test", i*buffer.capacity(), buffer);
+            sumTime += System.nanoTime()-t;
+            System.out.println("Write time: "+(System.nanoTime()-t)+"ns");
+        }
+        System.out.println("Average write time: "+(sumTime/T)+"ns");
     }
 }
