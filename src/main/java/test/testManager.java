@@ -13,7 +13,17 @@ import java.util.Map;
 
 public class testManager {
     public static void main(String[] args) {
+<<<<<<< HEAD
         testBlock();
+=======
+        Manager manager = new Manager();
+//        testParallelWrite(manager, "test", 0, 0, 40);
+//        testSequentRead(manager, "test", 0, 0, 40);
+
+        testSequentWrite(manager, "test", 0, 0, 40);
+        testSequentWrite(manager, "test", 1, 0, 40);
+        testParallelRead(manager, "test", 0, 0, 40, "test", 1, 20, 40);
+>>>>>>> test
     }
 
     /**
@@ -49,6 +59,11 @@ public class testManager {
 
     }
 
+    static void testSequent(Manager manager, String topic, int qid, int s, int e) {
+        testSequentWrite(manager, topic, qid, s, e);
+        testSequentRead(manager, topic, qid, s, e);
+    }
+
     /**
      * 串行读数据
      * 冷队列读(yes), range(0, 20)
@@ -63,6 +78,7 @@ public class testManager {
         System.out.println("}");
 
     }
+
 
     /**
      * 串行写数据(yes)*/
