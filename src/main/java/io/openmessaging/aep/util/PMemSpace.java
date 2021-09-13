@@ -27,18 +27,11 @@ public class PMemSpace implements Space {
     public PMemSpace(String path, long size) {
         boolean initialized = Heap.exists(path);
         heap = initialized ? Heap.openHeap(path) : Heap.createHeap(path, size);
-<<<<<<< HEAD
-        mainBlock = heap.allocateMemoryBlock(size-10*StorageSize.MB);
-        mmu = new PMemMMU2(mainBlock.size());
-        readerWriter = new PMemReaderWriter(mainBlock);
-        this.size = mainBlock.size();
-=======
         this.size = heap.size();
         partSpace = new PMemPartitionSpace[(int) (size/StorageSize.DEFAULT_PARTITION_SIZE)];
         for (int i = 0; i < partSpace.length; i++) {
             partSpace[i] = new PMemPartitionSpace(heap.allocateMemoryBlock(StorageSize.DEFAULT_PARTITION_SIZE), (byte) i);
         }
->>>>>>> test
     }
 
     @Override

@@ -13,9 +13,8 @@ import java.util.Map;
 
 public class testManager {
     public static void main(String[] args) {
-<<<<<<< HEAD
+
         testBlock();
-=======
         Manager manager = new Manager();
 //        testParallelWrite(manager, "test", 0, 0, 40);
 //        testSequentRead(manager, "test", 0, 0, 40);
@@ -23,7 +22,6 @@ public class testManager {
         testSequentWrite(manager, "test", 0, 0, 40);
         testSequentWrite(manager, "test", 1, 0, 40);
         testParallelRead(manager, "test", 0, 0, 40, "test", 1, 20, 40);
->>>>>>> test
     }
 
     /**
