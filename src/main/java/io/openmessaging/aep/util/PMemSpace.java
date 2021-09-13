@@ -43,8 +43,16 @@ public class PMemSpace implements Space {
      * 负载均衡，选择一个partition进行写入*/
     @Override
     public MemoryListNode write(byte[] data) {
-        int p = (int) (lbp.getAndIncrement() % partSpace.length);
-        return partSpace[p].write(data);
+        MemoryListNode listNode = null;
+        // 尝试从所有的partition中寻找到空间合适的那个
+        for (int i = 0; i < partSpace.length; i++) {
+            int p = (int) (lbp.getAndIncrement() % partSpace.length);
+            listNode = partSpace[p].write(data);
+            if (listNode != null) {
+                break;
+            }
+        }
+        return listNode;
     }
 
     @Override

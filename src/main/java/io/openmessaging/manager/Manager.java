@@ -64,7 +64,7 @@ public class Manager {
      * 写方法*/
     public long append(String topic, int queueId, ByteBuffer data){
         long sTime = System.nanoTime();
-//        long pmemIOTIme = 0, mapTime, write2DiskTime;
+        long pmemIOTIme = 0, mapTime, write2DiskTime;
 
         long appendOffset;
         long dataOffset;
@@ -85,7 +85,7 @@ public class Manager {
         dataOffset = dataFilePartitionMap.getOrDefault(partitionPath, 0L);
         dataFilePartitionMap.put(partitionPath, dataOffset+data.capacity());
 
-//        mapTime = System.nanoTime();
+        mapTime = System.nanoTime();
 
 //        try {
 //            writeLock.lock();
@@ -135,7 +135,15 @@ public class Manager {
         writeSSDData.start();
         writeSSDIndex.start();
 
-//        write2DiskTime = System.nanoTime();
+        try {
+            writeSSDData.join();
+            writeSSDIndex.join();
+        } catch (Exception e) {
+            logger.error("Write SSD thread: "+e.toString());
+            return -1L;
+        }
+
+        write2DiskTime = System.nanoTime();
 
         // 分阶段
         if (!isStageChanged.get()) {  // 第一阶段
@@ -163,7 +171,7 @@ public class Manager {
                 return -1;
             }
 
-//            pmemIOTIme = System.nanoTime();
+            pmemIOTIme = System.nanoTime();
 
             // 写入aep成功
             if (memoryListNode != null) {
@@ -208,24 +216,17 @@ public class Manager {
             }
         }
 
-//        // System.out.println("Append spend time: "+(write2DiskTime-sTime)+"ns, map time: "+(mapTime-sTime)+"ns, pmem io time: "+(pmemIOTIme-mapTime)+"ns, disk io time: "+(write2DiskTime-mapTime)+"ns");
-//        sumAppendTime.addAndGet(pmemIOTIme-sTime);
-//        sumMapTime.addAndGet(mapTime-sTime);
-//        sumPMemIO.addAndGet(pmemIOTIme-write2DiskTime);
-//        sumDiskIO.addAndGet(write2DiskTime-mapTime);
-//        System.out.printf("Append spend time: %dns, map time: %dns, pmem io time: %dns, disk io time: %dns\n" +
-//                        "Spend time - map time: %f%%, pmem io: %f%%, hdd io: %f%%\n\n",
-//                pmemIOTIme-sTime, mapTime-sTime, pmemIOTIme-write2DiskTime, write2DiskTime-mapTime,
-//                (double)sumMapTime.get()/sumAppendTime.get(), (double)sumPMemIO.get()/sumAppendTime.get(),
-//                (double)sumDiskIO.get()/sumAppendTime.get());
 
-        try {
-            writeSSDData.join();
-            writeSSDIndex.join();
-        } catch (Exception e) {
-            logger.error("Write SSD thread: "+e.toString());
-            return -1L;
-        }
+        sumAppendTime.addAndGet(pmemIOTIme-sTime);
+        sumMapTime.addAndGet(mapTime-sTime);
+        sumPMemIO.addAndGet(pmemIOTIme-write2DiskTime);
+        sumDiskIO.addAndGet(write2DiskTime-mapTime);
+        System.out.printf("Append spend time: %dns, map time: %dns, pmem io time: %dns, disk io time: %dns\n" +
+                        "Spend time - map time: %f%%, pmem io: %f%%, hdd io: %f%%\n\n",
+                pmemIOTIme-sTime, mapTime-sTime, pmemIOTIme-write2DiskTime, write2DiskTime-mapTime,
+                (double)sumMapTime.get()/sumAppendTime.get(), (double)sumPMemIO.get()/sumAppendTime.get(),
+                (double)sumDiskIO.get()/sumAppendTime.get());
+
         return appendOffset;
     }
 
