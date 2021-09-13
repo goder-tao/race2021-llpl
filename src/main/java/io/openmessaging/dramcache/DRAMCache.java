@@ -1,6 +1,7 @@
 package io.openmessaging.dramcache;
 
 import io.openmessaging.constant.StorageSize;
+import io.openmessaging.util.MapUtil;
 import io.openmessaging.util.SystemMemory;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
@@ -60,17 +61,17 @@ public class DRAMCache {
 
     public void put(String topicAndQId, long off, ByteBuffer v) {
         v.rewind();
-        Map<Long, ByteBuffer> map = getOrPutDefault(cacheMap, topicAndQId, new ConcurrentHashMap<>());
+        Map<Long, ByteBuffer> map = MapUtil.getOrPutDefault(cacheMap, topicAndQId, new ConcurrentHashMap<>());
         map.put(off, v);
     }
     public ByteBuffer getAndRemove(String topicAndQId, long off) {
-        Map<Long, ByteBuffer> map = getOrPutDefault(cacheMap, topicAndQId, new ConcurrentHashMap<>());
+        Map<Long, ByteBuffer> map = MapUtil.getOrPutDefault(cacheMap, topicAndQId, new ConcurrentHashMap<>());
         ByteBuffer data = map.get(off);
         map.remove(off);
         return data;
     }
     public void remove(String topicAndQId, long off) {
-        Map<Long, ByteBuffer> map = getOrPutDefault(cacheMap, topicAndQId, new ConcurrentHashMap<>());
+        Map<Long, ByteBuffer> map = MapUtil.getOrPutDefault(cacheMap, topicAndQId, new ConcurrentHashMap<>());
         map.remove(off);
     }
 
@@ -78,12 +79,4 @@ public class DRAMCache {
         return currentMemory > memoryDownThreshold;
     }
 
-    private <K, V> V getOrPutDefault(Map<K, V> map, K key, V defaultValue){
-        V retObj = map.get(key);
-        if(retObj != null){
-            return retObj;
-        }
-        map.put(key, defaultValue);
-        return defaultValue;
-    }
 }
