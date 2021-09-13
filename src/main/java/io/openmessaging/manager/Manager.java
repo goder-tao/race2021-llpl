@@ -118,23 +118,18 @@ public class Manager {
 
         // 多线程双写, buffer并发不安全
         ByteBuffer b1 = ByteBufferUtil.copyFrom(data);
+        ByteBuffer b2 = ByteBufferUtil.copyFrom(data);
 
         // .index .data并发双写
         Thread writeSSDData = new Thread(new Runnable() {
             @Override
             public void run() {
-                int writeStatus = ssdWriterReader.write(MntPath.SSD_PATH+topic+"/"+queueId+"/", partitionPath+".data", dataOffset, data);
-                if (writeStatus == StatusCode.ERROR) {
-                    logger.error("Manager write disk data fail, status code:" + writeStatus);
-                }
+                int writeStatus = ssdWriterReader.write(MntPath.SSD_PATH+topic+"/"+queueId+"/", partitionPath+".data", dataOffset, b2);
             }
         }), writeSSDIndex = new Thread(new Runnable() {
             @Override
             public void run() {
                 int writeStatus = ssdWriterReader.write(MntPath.SSD_PATH+topic+"/"+queueId+"/", partitionPath+".index", indexOffsetC*10, indexData);
-                if (writeStatus == StatusCode.ERROR) {
-                    logger.error("Manager write disk index fail, status code:" + writeStatus);
-                }
             }
         });
         writeSSDData.start();
