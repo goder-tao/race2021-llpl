@@ -9,19 +9,19 @@ import io.openmessaging.dramcache.DRAMCache;
 import io.openmessaging.manager.Manager;
 import io.openmessaging.util.SystemMemory;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 
 public class testManager {
     public static void main(String[] args) {
-        Manager manager = new Manager();
-        testSequentWrite(manager, "test", 0, 0, 40);
-        testSequentWrite(manager, "test", 1, 0, 40);
-        testParallelRead(manager, "test", 0, 0, 40, "test", 1, 20, 40);
+//        Manager manager = new Manager();
+//        testParallelWrite(manager, "test", 0, 0, 40);
+//        testSequentRead(manager, "test", 0, 0, 40);
+
+//        testSequentWrite(manager, "test", 0, 0, 40);
+//        testSequentWrite(manager, "test", 1, 0, 40);
+//        testParallelRead(manager, "test", 0, 0, 40, "test", 1, 20, 40);
     }
 
     /**
@@ -62,6 +62,11 @@ public class testManager {
 
     }
 
+    static void testSequent(Manager manager, String topic, int qid, int s, int e) {
+        testSequentWrite(manager, topic, qid, s, e);
+        testSequentRead(manager, topic, qid, s, e);
+    }
+
     /**
      * 串行读数据
      * 冷队列读(yes), range(0, 20)
@@ -76,6 +81,7 @@ public class testManager {
         System.out.println("}");
 
     }
+
 
     /**
      * 串行写数据(yes)*/

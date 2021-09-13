@@ -8,6 +8,7 @@ public class MemoryListNode {
     public MemoryListNode preNode, nextNode;
     public long blockSize, blockOffset;
     public PMemMMU2 pMemMMU;
+    public byte partiotion;
 
     public MemoryListNode(long offset, long size, MemoryListNode preNode, MemoryListNode nextNode, PMemMMU2 pMemMMU) {
         this.blockOffset = offset;

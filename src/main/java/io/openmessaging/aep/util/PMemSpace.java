@@ -7,59 +7,55 @@ import io.openmessaging.aep.mmu.PMemMMU2;
 import io.openmessaging.constant.StorageSize;
 
 import java.nio.ByteBuffer;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * 代表aep中的一块空间，创建一个size大小的heap，利用heap分配一个尽可能大的MemoryBlock
- * 称为mainBlock，以offset和size的方式使用llpl库读写mainBlock，实测能有将近于FS方式
- * 的两倍性能。包含一个MMU手动管理mainBlock的存储使用情况，分配写入的offset，再调用
- * PMemeReaderWriter根据offset操作mainBlock
+ * 创建一个较大的空间的Heap，均分成固定大小相等的MemoryBlock作为partition，
+ * 利用负载均衡算法（轮询）指定本次分配空间的partition，再由对应partition的
+ * PMemPartitionSpace具体处理数据。PMemSpace只负责partition的创建以及请求
+ * 的负载均衡
  * @author tao */
 public class PMemSpace implements Space {
     private Heap heap;
-    private final MemoryBlock mainBlock;
+    // 分区对应的PMemPartitionSpace
+    private final PMemPartitionSpace[] partSpace;
+    // 默认partition大小
+    private final long defaultPartitionSize = StorageSize.MB*10;
+    // 负载均衡的轮询指针, 保证并发
+    private AtomicLong lbp = new AtomicLong(0);
     private final long size;
-    private final PMemMMU2 mmu;
-    private final PMemReaderWriter readerWriter;
+
     public PMemSpace(String path, long size) {
         boolean initialized = Heap.exists(path);
         heap = initialized ? Heap.openHeap(path) : Heap.createHeap(path, size);
-        mainBlock = heap.allocateMemoryBlock(size-5*StorageSize.MB);
-        mmu = new PMemMMU2(mainBlock.size());
-        readerWriter = new PMemReaderWriter(mainBlock);
-        this.size = mainBlock.size();
+        this.size = heap.size();
+        partSpace = new PMemPartitionSpace[(int) (size/defaultPartitionSize)];
+        for (int i = 0; i < partSpace.length; i++) {
+            partSpace[i] = new PMemPartitionSpace(heap.allocateMemoryBlock(defaultPartitionSize), (byte) i);
+//            System.out.println(i);
+        }
     }
 
     @Override
     public void free(MemoryListNode listNode) {
-        mmu.free(listNode);
+        partSpace[listNode.partiotion].free(listNode);
     }
 
     /**
-     * MMU先分配一个handle，再调用readerWriter写入*/
+     * 负载均衡，选择一个partition进行写入*/
     @Override
     public MemoryListNode write(byte[] data) {
-        MemoryListNode listNode = mmu.allocate(data.length);
-        if (listNode != null) {
-            readerWriter.write(listNode.blockOffset, data);
-        } else {
-
-        }
-        return listNode;
+        int p = (int) (lbp.getAndIncrement() % partSpace.length);
+        return partSpace[p].write(data);
     }
 
     @Override
     public byte[] read(MemoryListNode listNode) {
-        return readerWriter.read(listNode.blockOffset, (int) listNode.blockSize);
+        return partSpace[listNode.partiotion].read(listNode);
     }
 
     public ByteBuffer readDataAndFree(MemoryListNode memoryListNode) {
-        ByteBuffer buffer;
-        byte[] b = readerWriter.read(memoryListNode.blockOffset, (int) memoryListNode.blockSize);
-        free(memoryListNode);
-        buffer = ByteBuffer.allocate(b.length);
-        buffer.put(b);
-        buffer.rewind();
-        return buffer;
+        return partSpace[memoryListNode.partiotion].readDataAndFree(memoryListNode);
     }
 
     public long getSize() {

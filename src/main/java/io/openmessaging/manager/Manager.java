@@ -110,9 +110,6 @@ public class Manager {
 //            writeLock.unlock();
 //        }
 
-        Map<Integer, PriorityListNode> coldQueueMap = getOrPutDefault(coldTopicQueueMap, topic, new ConcurrentHashMap<>());
-        PriorityListNode node = coldQueueMap.getOrDefault(queueId, null);
-
         // .index文件数据
         ByteBuffer indexData = ByteBuffer.allocate(10);
         indexData.putLong(dataOffset);
@@ -177,11 +174,14 @@ public class Manager {
                 Map<Integer, Map<Long, MemoryListNode>> queueOffsetHandle = getOrPutDefault(coldTopicQueueOffsetHandle, topic, new ConcurrentHashMap<>());
                 Map<Long, MemoryListNode> offsetHandle = getOrPutDefault(queueOffsetHandle, queueId, new ConcurrentHashMap<>());
                 offsetHandle.put(appendOffset, memoryListNode);
+
+                Map<Integer, PriorityListNode> coldQueueMap = getOrPutDefault(coldTopicQueueMap, topic, new ConcurrentHashMap<>());
+                PriorityListNode node = coldQueueMap.getOrDefault(queueId, null);
                 if (node == null) {
                     // 成功写入aep冷空间且队列信息未注册，一阶段全部视为冷队列
                     node = new PriorityListNode(topic, queueId);
-                    scheduler.queuePriorityList.enterListHead(node);
                     coldQueueMap.put(queueId, node);
+                    scheduler.queuePriorityList.enterListHead(node);
                 }
                 // 更新队列信息
                 node.queueDataSize.addAndGet(data.capacity());
@@ -190,6 +190,8 @@ public class Manager {
                 }
             }
         } else {  // 第二阶段
+            Map<Integer, PriorityListNode> coldQueueMap = getOrPutDefault(coldTopicQueueMap, topic, new ConcurrentHashMap<>());
+            PriorityListNode node = coldQueueMap.getOrDefault(queueId, null);
             // 冷热队列判断, 不再有新的队列加入进来, 热队列会被删掉, 根据null值判队列冷热
             if(node == null) {  // 热队列
                 if(dramCache.isCacheAvailable()) {  // 缓存在dram
