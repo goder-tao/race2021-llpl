@@ -109,9 +109,9 @@ public class SSDWriterReader implements DiskReader, DiskWriter {
         }
         long SSDDataStartOffset = -1L;
         int SSDReadBlockSize = 0;
-        int[] size = new int[fetchNum];
+        int[] size = new int[indexData.capacity()/10];
         // 寻找.data文件的起止点
-        for (int i = 0; i < fetchNum; i++) {
+        for (int i = 0; i < size.length; i++) {
             if (i == 0) {
                 SSDDataStartOffset = indexData.getLong();
                 size[i] = indexData.getShort();
@@ -123,7 +123,7 @@ public class SSDWriterReader implements DiskReader, DiskWriter {
         }
         // 从ssd读数据
         ByteBuffer SSDData = read(MntPath.SSD_PATH+topic+"/"+queueId+"/"+partitionPath+".data", SSDDataStartOffset, SSDReadBlockSize);
-        for (int i = 0; i < fetchNum; i++) {
+        for (int i = 0; i < size.length; i++) {
             byte[] bytes = new byte[size[i]];
             SSDData.get(bytes);
             map.put(offset+i, bytes);

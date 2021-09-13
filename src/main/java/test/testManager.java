@@ -15,13 +15,13 @@ import java.util.Map;
 
 public class testManager {
     public static void main(String[] args) {
-//        Manager manager = new Manager();
+        Manager manager = new Manager();
 //        testParallelWrite(manager, "test", 0, 0, 40);
 //        testSequentRead(manager, "test", 0, 0, 40);
 
-//        testSequentWrite(manager, "test", 0, 0, 40);
-//        testSequentWrite(manager, "test", 1, 0, 40);
-//        testParallelRead(manager, "test", 0, 0, 40, "test", 1, 20, 40);
+        testSequentWrite(manager, "test", 0, 0, 40);
+        testSequentWrite(manager, "test", 1, 0, 40);
+        testParallelRead(manager, "test", 0, 0, 40, "test", 1, 20, 40);
     }
 
     /**

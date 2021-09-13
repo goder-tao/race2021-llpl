@@ -20,7 +20,6 @@ public class PMemSpace implements Space {
     // 分区对应的PMemPartitionSpace
     private final PMemPartitionSpace[] partSpace;
     // 默认partition大小
-    private final long defaultPartitionSize = StorageSize.MB*10;
     // 负载均衡的轮询指针, 保证并发
     private AtomicLong lbp = new AtomicLong(0);
     private final long size;
@@ -29,10 +28,9 @@ public class PMemSpace implements Space {
         boolean initialized = Heap.exists(path);
         heap = initialized ? Heap.openHeap(path) : Heap.createHeap(path, size);
         this.size = heap.size();
-        partSpace = new PMemPartitionSpace[(int) (size/defaultPartitionSize)];
+        partSpace = new PMemPartitionSpace[(int) (size/StorageSize.DEFAULT_PARTITION_SIZE)];
         for (int i = 0; i < partSpace.length; i++) {
-            partSpace[i] = new PMemPartitionSpace(heap.allocateMemoryBlock(defaultPartitionSize), (byte) i);
-//            System.out.println(i);
+            partSpace[i] = new PMemPartitionSpace(heap.allocateMemoryBlock(StorageSize.DEFAULT_PARTITION_SIZE), (byte) i);
         }
     }
 

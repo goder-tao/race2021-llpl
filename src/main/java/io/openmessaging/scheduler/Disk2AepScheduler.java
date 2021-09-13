@@ -4,6 +4,7 @@ import io.openmessaging.aep.mmu.MemoryListNode;
 import io.openmessaging.aep.util.PMemSpace;
 import io.openmessaging.aep.util.PmemBlock;
 import io.openmessaging.ssd.SSDWriterReader;
+import io.openmessaging.util.MapUtil;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import sun.misc.Lock;
@@ -88,8 +89,8 @@ public class Disk2AepScheduler {
             // 数据调度
             long tailOffset = move.tailOffset.get();
             Map<Long, byte[]> offsetDataMap = ssdWriterReader.directRead(move.topic, move.queueId, tailOffset, fetchNum);
-            Map<Integer, Map<Long, MemoryListNode>> queueOffsetHandle = getOrPutDefault(topicQueueOffsetHandle, move.topic, new ConcurrentHashMap<>());
-            Map<Long, MemoryListNode> offsetHandle = getOrPutDefault(queueOffsetHandle, move.queueId, new ConcurrentHashMap<>());
+            Map<Integer, Map<Long, MemoryListNode>> queueOffsetHandle = MapUtil.getOrPutDefault(topicQueueOffsetHandle, move.topic, new ConcurrentHashMap<>());
+            Map<Long, MemoryListNode> offsetHandle = MapUtil.getOrPutDefault(queueOffsetHandle, move.queueId, new ConcurrentHashMap<>());
             // 尝试调度入aep
             for (long offset:offsetDataMap.keySet()) {
                 byte[] b = offsetDataMap.get(offset);
@@ -114,14 +115,6 @@ public class Disk2AepScheduler {
         }
     }
 
-    private <K, V> V getOrPutDefault(Map<K, V> map, K key, V defaultValue){
-        V retObj = map.get(key);
-        if(retObj != null){
-            return retObj;
-        }
-        map.put(key, defaultValue);
-        return defaultValue;
-    }
 }
 
 
