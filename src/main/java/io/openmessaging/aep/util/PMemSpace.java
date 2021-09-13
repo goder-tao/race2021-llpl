@@ -30,7 +30,7 @@ public class PMemSpace implements Space {
         this.size = heap.size();
         partSpace = new PMemPartitionSpace[(int) (size/StorageSize.DEFAULT_PARTITION_SIZE)];
         for (int i = 0; i < partSpace.length; i++) {
-            partSpace[i] = new PMemPartitionSpace(heap.allocateMemoryBlock(StorageSize.DEFAULT_PARTITION_SIZE), (byte) i);
+            partSpace[i] = new PMemPartitionSpace(heap.allocateMemoryBlock(StorageSize.DEFAULT_PARTITION_SIZE-StorageSize.MB*10), (byte) i);
         }
     }
 
