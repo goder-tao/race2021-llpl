@@ -22,6 +22,8 @@ public class testManager {
         testSequentWrite(manager, "test", 0, 0, 40);
         testSequentWrite(manager, "test", 1, 0, 40);
         testParallelRead(manager, "test", 0, 0, 40, "test", 1, 20, 40);
+
+
     }
 
     /**

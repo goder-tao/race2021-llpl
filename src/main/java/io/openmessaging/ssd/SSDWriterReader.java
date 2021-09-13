@@ -77,10 +77,7 @@ public class SSDWriterReader implements DiskReader, DiskWriter {
         try {
             File dir = new File(dirPath);
             if (!dir.exists()) {
-                boolean b = dir.mkdirs();
-                if (!b) {
-                    logger.error("Create dir fail!!");
-                }
+                dir.mkdirs();
             }
             RandomAccessFile file = new RandomAccessFile(dirPath + fileName, "rw");
 
