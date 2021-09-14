@@ -1,10 +1,8 @@
 package io.openmessaging.aep.util;
 
-import com.intel.pmem.llpl.Heap;
 import com.intel.pmem.llpl.MemoryBlock;
 import io.openmessaging.aep.mmu.MemoryListNode;
 import io.openmessaging.aep.mmu.PMemMMU2;
-import io.openmessaging.constant.StorageSize;
 
 import java.nio.ByteBuffer;
 
@@ -13,8 +11,10 @@ import java.nio.ByteBuffer;
  * 称为mainBlock，以offset和size的方式使用llpl库读写mainBlock，实测能有将近于FS方式
  * 的两倍性能。包含一个MMU手动管理mainBlock的存储使用情况，分配写入的offset，再调用
  * PMemeReaderWriter根据offset操作mainBlock
- * @author tao */
-public class PMemPartitionSpace implements Space{
+ *
+ * @author tao
+ */
+public class PMemPartitionSpace implements Space {
     private final MemoryBlock mainBlock;
     private final long size;
     private final PMemMMU2 mmu;
@@ -22,7 +22,7 @@ public class PMemPartitionSpace implements Space{
     private final byte partition;
 
     public PMemPartitionSpace(MemoryBlock memoryBlock, byte partition) {
-       this.mainBlock = memoryBlock;
+        this.mainBlock = memoryBlock;
         mmu = new PMemMMU2(mainBlock.size());
         readerWriter = new PMemReaderWriter(mainBlock);
         this.size = mainBlock.size();
@@ -35,7 +35,8 @@ public class PMemPartitionSpace implements Space{
     }
 
     /**
-     * MMU先分配一个handle，再调用readerWriter写入*/
+     * MMU先分配一个handle，再调用readerWriter写入
+     */
     @Override
     public MemoryListNode write(byte[] data) {
         MemoryListNode listNode = mmu.allocate(data.length);

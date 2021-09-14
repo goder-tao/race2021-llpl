@@ -1,10 +1,10 @@
 package io.openmessaging.aep.mmu;
 
-import com.intel.pmem.llpl.MemoryBlock;
 import com.intel.pmem.llpl.Heap;
+import com.intel.pmem.llpl.MemoryBlock;
 import com.intel.pmem.llpl.Range;
 
-public class PMemMMU  implements MMU{
+public class PMemMMU implements MMU {
     private final Heap heap;
 
     public PMemMMU(String path, long size) {
@@ -13,7 +13,8 @@ public class PMemMMU  implements MMU{
     }
 
     /**
-     * get MemoryBlock by its handle*/
+     * get MemoryBlock by its handle
+     */
     public MemoryBlock getBlock(long handle) {
         return heap.memoryBlockFromHandle(handle);
     }

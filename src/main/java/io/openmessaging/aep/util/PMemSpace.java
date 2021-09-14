@@ -1,9 +1,7 @@
 package io.openmessaging.aep.util;
 
 import com.intel.pmem.llpl.Heap;
-import com.intel.pmem.llpl.MemoryBlock;
 import io.openmessaging.aep.mmu.MemoryListNode;
-import io.openmessaging.aep.mmu.PMemMMU2;
 import io.openmessaging.constant.StorageSize;
 
 import java.nio.ByteBuffer;
@@ -14,7 +12,9 @@ import java.util.concurrent.atomic.AtomicLong;
  * 利用负载均衡算法（轮询）指定本次分配空间的partition，再由对应partition的
  * PMemPartitionSpace具体处理数据。PMemSpace只负责partition的创建以及请求
  * 的负载均衡
- * @author tao */
+ *
+ * @author tao
+ */
 public class PMemSpace implements Space {
     private Heap heap;
     // 分区对应的PMemPartitionSpace
@@ -28,7 +28,7 @@ public class PMemSpace implements Space {
         boolean initialized = Heap.exists(path);
         heap = initialized ? Heap.openHeap(path) : Heap.createHeap(path, size);
         this.size = heap.size();
-        partSpace = new PMemPartitionSpace[(int) (size/StorageSize.DEFAULT_PARTITION_SIZE)];
+        partSpace = new PMemPartitionSpace[(int) (size / StorageSize.DEFAULT_PARTITION_SIZE)];
         for (int i = 0; i < partSpace.length; i++) {
             partSpace[i] = new PMemPartitionSpace(heap.allocateMemoryBlock(StorageSize.DEFAULT_PARTITION_SIZE), (byte) i);
         }
@@ -40,7 +40,8 @@ public class PMemSpace implements Space {
     }
 
     /**
-     * 负载均衡，选择一个partition进行写入*/
+     * 负载均衡，选择一个partition进行写入
+     */
     @Override
     public MemoryListNode write(byte[] data) {
         int p = (int) (lbp.getAndIncrement() % partSpace.length);

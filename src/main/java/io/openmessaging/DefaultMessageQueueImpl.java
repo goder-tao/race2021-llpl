@@ -8,16 +8,17 @@ import java.util.Map;
 
 /**
  * Our solution
- * */
+ */
 public class DefaultMessageQueueImpl extends MessageQueue {
-    private Manager manager;
+    private final Manager manager;
+
     public DefaultMessageQueueImpl() {
         manager = new Manager();
     }
 
 
     @Override
-    public long append(String topic, int queueId, ByteBuffer data){
+    public long append(String topic, int queueId, ByteBuffer data) {
         return manager.append(topic, queueId, data);
     }
 

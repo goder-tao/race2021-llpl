@@ -46,8 +46,10 @@ public class DRAMCache {
     }
 
     private static Lock lock = new Lock();
+
     /**
-     * 单例模式*/
+     * 单例模式
+     */
     public static DRAMCache createOrGetCache() {
         if (cache == null) {
             synchronized (DRAMCache.class) {
@@ -64,12 +66,14 @@ public class DRAMCache {
         Map<Long, ByteBuffer> map = MapUtil.getOrPutDefault(cacheMap, topicAndQId, new ConcurrentHashMap<>());
         map.put(off, v);
     }
+
     public ByteBuffer getAndRemove(String topicAndQId, long off) {
         Map<Long, ByteBuffer> map = MapUtil.getOrPutDefault(cacheMap, topicAndQId, new ConcurrentHashMap<>());
         ByteBuffer data = map.get(off);
         map.remove(off);
         return data;
     }
+
     public void remove(String topicAndQId, long off) {
         Map<Long, ByteBuffer> map = MapUtil.getOrPutDefault(cacheMap, topicAndQId, new ConcurrentHashMap<>());
         map.remove(off);
