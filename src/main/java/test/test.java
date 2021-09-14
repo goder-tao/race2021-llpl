@@ -7,6 +7,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 class Node {
     int i;
+
     Node(int i) {
         this.i = i;
     }
@@ -15,6 +16,7 @@ class Node {
 class NodeTurn {
     private DRAMCache cache = null;
     int flag = 0;
+
     void initCache() {
         if (flag == 0) {
             flag = 1;
@@ -25,7 +27,6 @@ class NodeTurn {
         }
     }
 }
-
 
 
 public class test {

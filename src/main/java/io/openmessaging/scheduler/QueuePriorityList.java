@@ -6,19 +6,22 @@ import org.apache.log4j.Logger;
 import sun.misc.Lock;
 
 /**
- * 带头节点的双向环形队列，每次寻找queue调度数据都从队列头部开始寻找合适的node*/
+ * 带头节点的双向环形队列，每次寻找queue调度数据都从队列头部开始寻找合适的node
+ */
 public class QueuePriorityList {
     PriorityListNode head = null;
     private Lock enterLock = new Lock(), deLock = new Lock();
     private Logger logger = LogManager.getLogger(QueuePriorityList.class.getName());
     // queue数量
     int node_n = 0;
+
     public QueuePriorityList() {
 
     }
 
     /**
-     * 进入list头*/
+     * 进入list头
+     */
     public void enterListHead(PriorityListNode listNode) {
         try {
             enterLock.lock();
@@ -35,14 +38,15 @@ public class QueuePriorityList {
             }
             node_n++;
         } catch (Exception e) {
-            logger.error("PriorityList enterListHead(): "+e.toString());
+            logger.error("PriorityList enterListHead(): " + e.toString());
         } finally {
             enterLock.unlock();
         }
     }
 
     /**
-     * 从将listNode的pre和next关系安全删除*/
+     * 从将listNode的pre和next关系安全删除
+     */
     public void deList(PriorityListNode listNode) {
         try {
             deLock.lock();
@@ -56,7 +60,7 @@ public class QueuePriorityList {
             }
             node_n--;
         } catch (Exception e) {
-            logger.error("PriorityList deList(): "+e.toString());
+            logger.error("PriorityList deList(): " + e.toString());
         } finally {
             deLock.unlock();
         }
