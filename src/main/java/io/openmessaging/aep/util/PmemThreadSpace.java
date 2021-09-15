@@ -7,6 +7,7 @@ import io.openmessaging.constant.StorageSize;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 创建一个线程的pmem空间，每个thread space中有若干fixed size的MemoryBlock，
@@ -17,9 +18,10 @@ public class PmemThreadSpace implements Space {
     // 总空间heap
     Heap heap;
     // 已经分配了的MemoryBlock ArrayList
+
     private final ArrayList<PMemPartitionSpace> partitionSpacesList = new ArrayList<>();
     // 当前partition的标记
-    private byte currentPart = 0;
+    private AtomicInteger currentPart = new AtomicInteger(0);
     // 阶段标记, 先向heap请求分配至heap满，满了之后再循环再已分配的partition中寻找合适的空间存储
     private byte stage = 1;
     private boolean full = false;
@@ -41,7 +43,7 @@ public class PmemThreadSpace implements Space {
     @Override
     public MemoryListNode write(byte[] data) {
         MemoryListNode memoryListNode = null;
-        memoryListNode = partitionSpacesList.get(currentPart).write(data);
+        memoryListNode = partitionSpacesList.get(currentPart.get()).write(data);
         // 上一块partitionSpace已满
         if (memoryListNode == null) {
             if (!full) {
@@ -52,26 +54,27 @@ public class PmemThreadSpace implements Space {
                 } catch (Exception e) {
                     // 捕捉heap无法再分配的错误， 标记满
                     full = true;
-                    System.out.println();
                 }
                 if (newBlock != null) {
-                    currentPart++;
-                    PMemPartitionSpace newPartitionSpace = new PMemPartitionSpace(newBlock, currentPart);
+                    currentPart.incrementAndGet();
+                    PMemPartitionSpace newPartitionSpace = new PMemPartitionSpace(newBlock, (byte) currentPart.get());
                     partitionSpacesList.add(newPartitionSpace);
                     memoryListNode = newPartitionSpace.write(data);
                 }
             } else {
                 // 二阶段再partition中循环寻找合适的空间
                 if (stage == 2) {
-                    int current = currentPart;
-                    int move = currentPart+1;
+                    int current = currentPart.get();
+                    int move = current+1;
                     // 寻找
                     while (move%partitionSpacesList.size() != current) {
-                        memoryListNode = partitionSpacesList.get(move).write(data);
+                        memoryListNode = partitionSpacesList.get(move%partitionSpacesList.size()).write(data);
                         // 找到合适的partition
                         if (memoryListNode != null) {
+                            currentPart.set(move%partitionSpacesList.size());
                             break;
                         }
+                        move++;
                     }
                 }
             }
