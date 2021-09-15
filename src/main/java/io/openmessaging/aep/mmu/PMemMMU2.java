@@ -71,7 +71,7 @@ public class PMemMMU2 implements MMU2{
                 return move;
             }
             // create new node
-            MemoryListNode newNode = new MemoryListNode(move.blockOffset, size, move.preNode, move, this);
+            MemoryListNode newNode = new MemoryListNode(move.blockOffset, size, move.preNode, move, this, Thread.currentThread().getName());
             move.blockOffset += size;
             move.blockSize -= size;
             move.preNode.nextNode = newNode;

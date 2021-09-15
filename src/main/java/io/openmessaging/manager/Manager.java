@@ -4,7 +4,6 @@ import io.openmessaging.aep.mmu.MemoryListNode;
 import io.openmessaging.aep.util.PMemSpace;
 import io.openmessaging.constant.DataFileBasicInfo;
 import io.openmessaging.constant.MntPath;
-import io.openmessaging.constant.StatusCode;
 import io.openmessaging.constant.StorageSize;
 import io.openmessaging.dramcache.DRAMCache;
 import io.openmessaging.scheduler.Disk2AepScheduler;
@@ -71,8 +70,9 @@ public class Manager {
         long indexOffsetC;
         String partitionPath;
 
+        // append offset
         Map<Integer, Long> queueOffset;
-        queueOffset = MapUtil.getOrPutDefault(topicQueueOffset, topic, new ConcurrentHashMap<>());
+        queueOffset = MapUtil.getOrPutDefault(topicQueueOffset, topic, new HashMap<>());
         appendOffset = queueOffset.getOrDefault(queueId, 0L);
         queueOffset.put(queueId, appendOffset+1);
         // 确定分区
@@ -80,36 +80,12 @@ public class Manager {
         indexOffsetC = appendOffset % DataFileBasicInfo.ITEM_NUM;
         partitionPath = PartitionMaker.makePartitionPath(partition, DataFileBasicInfo.FILE_NAME_LENGTH, DataFileBasicInfo.ITEM_NUM);
         // .data文件当前offset
-        Map<Integer, Map<String, Long>> dataFileQueueMap = MapUtil.getOrPutDefault(dataFileOffset, topic, new ConcurrentHashMap<>());
-        Map<String, Long> dataFilePartitionMap = MapUtil.getOrPutDefault(dataFileQueueMap, queueId, new ConcurrentHashMap<>());
+        Map<Integer, Map<String, Long>> dataFileQueueMap = MapUtil.getOrPutDefault(dataFileOffset, topic, new HashMap<>());
+        Map<String, Long> dataFilePartitionMap = MapUtil.getOrPutDefault(dataFileQueueMap, queueId, new HashMap<>());
         dataOffset = dataFilePartitionMap.getOrDefault(partitionPath, 0L);
         dataFilePartitionMap.put(partitionPath, dataOffset+data.capacity());
 
         mapTime = System.nanoTime();
-
-//        try {
-//            writeLock.lock();
-//            // 互斥获取当前appendOffset
-//            Map<Integer, Long> queueOffset;
-//            queueOffset = MapUtil.getOrPutDefault(topicQueueOffset, topic, new ConcurrentHashMap<>());
-//            appendOffset = queueOffset.getOrDefault(queueId, 0L);
-//            queueOffset.put(queueId, appendOffset+1);
-//            // 确定分区
-//            int partition = (int) (appendOffset / DataFileBasicInfo.ITEM_NUM);
-//            indexOffsetC = appendOffset % DataFileBasicInfo.ITEM_NUM;
-//            partitionPath = PartitionMaker.makePartitionPath(partition, DataFileBasicInfo.FILE_NAME_LENGTH, DataFileBasicInfo.ITEM_NUM);
-//            // .data文件当前offset
-//            Map<Integer, Map<String, Long>> dataFileQueueMap = MapUtil.getOrPutDefault(dataFileOffset, topic, new ConcurrentHashMap<>());
-//            Map<String, Long> dataFilePartitionMap = MapUtil.getOrPutDefault(dataFileQueueMap, queueId, new ConcurrentHashMap<>());
-//            dataOffset = dataFilePartitionMap.getOrDefault(partitionPath, 0L);
-//            dataFilePartitionMap.put(partitionPath, dataOffset+data.capacity());
-//            writeLock.unlock();
-//        } catch (Exception e) {
-//            logger.error("Append writeLock: "+e.toString());
-//            return -1L;
-//        }finally {
-//            writeLock.unlock();
-//        }
 
         // .index文件数据
         ByteBuffer indexData = ByteBuffer.allocate(10);
@@ -175,11 +151,11 @@ public class Manager {
 
             // 写入aep成功
             if (memoryListNode != null) {
-                Map<Integer, Map<Long, MemoryListNode>> queueOffsetHandle = MapUtil.getOrPutDefault(coldTopicQueueOffsetHandle, topic, new ConcurrentHashMap<>());
-                Map<Long, MemoryListNode> offsetHandle = MapUtil.getOrPutDefault(queueOffsetHandle, queueId, new ConcurrentHashMap<>());
+                Map<Integer, Map<Long, MemoryListNode>> queueOffsetHandle = MapUtil.getOrPutDefault(coldTopicQueueOffsetHandle, topic, new HashMap<>());
+                Map<Long, MemoryListNode> offsetHandle = MapUtil.getOrPutDefault(queueOffsetHandle, queueId, new HashMap<>());
                 offsetHandle.put(appendOffset, memoryListNode);
 
-                Map<Integer, PriorityListNode> coldQueueMap = MapUtil.getOrPutDefault(coldTopicQueueMap, topic, new ConcurrentHashMap<>());
+                Map<Integer, PriorityListNode> coldQueueMap = MapUtil.getOrPutDefault(coldTopicQueueMap, topic, new HashMap<>());
                 PriorityListNode node = coldQueueMap.getOrDefault(queueId, null);
                 if (node == null) {
                     // 成功写入aep冷空间且队列信息未注册，一阶段全部视为冷队列
@@ -198,7 +174,7 @@ public class Manager {
                 }
             }
         } else {  // 第二阶段
-            Map<Integer, PriorityListNode> coldQueueMap = MapUtil.getOrPutDefault(coldTopicQueueMap, topic, new ConcurrentHashMap<>());
+            Map<Integer, PriorityListNode> coldQueueMap = MapUtil.getOrPutDefault(coldTopicQueueMap, topic, new HashMap<>());
             PriorityListNode node = coldQueueMap.getOrDefault(queueId, null);
             // 冷热队列判断, 不再有新的队列加入进来, 热队列会被删掉, 根据null值判队列冷热
             if(node == null) {  // 热队列
@@ -208,8 +184,8 @@ public class Manager {
                     MemoryListNode memoryListNode = writePMemOnly(hotBlock, topic, queueId, data);
                     // 写入aep成功
                     if (memoryListNode != null) {
-                        Map<Integer, Map<Long, MemoryListNode>> queueOffsetHandle = MapUtil.getOrPutDefault(hotTopicQueueOffsetHandle, topic, new ConcurrentHashMap<>());
-                        Map<Long, MemoryListNode> offsetHandle = MapUtil.getOrPutDefault(queueOffsetHandle, queueId, new ConcurrentHashMap<>());
+                        Map<Integer, Map<Long, MemoryListNode>> queueOffsetHandle = MapUtil.getOrPutDefault(hotTopicQueueOffsetHandle, topic, new HashMap<>());
+                        Map<Long, MemoryListNode> offsetHandle = MapUtil.getOrPutDefault(queueOffsetHandle, queueId, new HashMap<>());
                         offsetHandle.put(appendOffset, memoryListNode);
                     }
                 }
@@ -246,7 +222,7 @@ public class Manager {
         Map<Integer, ByteBuffer> dataMap;
         ByteBuffer data;
         // 队列信息节点
-        Map<Integer, PriorityListNode> coldQueueMap = MapUtil.getOrPutDefault(coldTopicQueueMap, topic, new ConcurrentHashMap<>());
+        Map<Integer, PriorityListNode> coldQueueMap = MapUtil.getOrPutDefault(coldTopicQueueMap, topic, new HashMap<>());
         PriorityListNode node = coldQueueMap.getOrDefault(queueId, null);
 
         // TODO 队列分开处理

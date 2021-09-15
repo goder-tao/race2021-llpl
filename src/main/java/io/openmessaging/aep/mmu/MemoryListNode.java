@@ -7,15 +7,17 @@ public class MemoryListNode {
     boolean used = true;
     public MemoryListNode preNode, nextNode;
     public long blockSize, blockOffset;
-    public PMemMMU2 pMemMMU;
+//    public PMemMMU2 pMemMMU;
     public byte partiotion;
+    public String tName;
 
-    public MemoryListNode(long offset, long size, MemoryListNode preNode, MemoryListNode nextNode, PMemMMU2 pMemMMU) {
+    public MemoryListNode(long offset, long size, MemoryListNode preNode, MemoryListNode nextNode, PMemMMU2 pMemMMU, String tNmae) {
         this.blockOffset = offset;
         this.blockSize = size;
         this.preNode = preNode;
         this.nextNode = nextNode;
-        this.pMemMMU = pMemMMU;
+//        this.pMemMMU = pMemMMU;
+        this.tName = tNmae;
     }
 
     /**
@@ -26,7 +28,7 @@ public class MemoryListNode {
     }
 
 
-    public void free() {
-        pMemMMU.free(this);
-    }
+//    public void free() {
+//        pMemMMU.free(this);
+//    }
 }

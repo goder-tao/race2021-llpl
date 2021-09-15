@@ -43,7 +43,7 @@ public class PMemPartitionSpace implements Space{
             readerWriter.write(listNode.blockOffset, data);
             listNode.partiotion = partition;
         } else {
-
+            
         }
         return listNode;
     }

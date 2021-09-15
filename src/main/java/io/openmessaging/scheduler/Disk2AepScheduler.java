@@ -9,6 +9,7 @@ import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import sun.misc.Lock;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -89,8 +90,8 @@ public class Disk2AepScheduler {
             // 数据调度
             long tailOffset = move.tailOffset.get();
             Map<Long, byte[]> offsetDataMap = ssdWriterReader.directRead(move.topic, move.queueId, tailOffset, fetchNum);
-            Map<Integer, Map<Long, MemoryListNode>> queueOffsetHandle = MapUtil.getOrPutDefault(topicQueueOffsetHandle, move.topic, new ConcurrentHashMap<>());
-            Map<Long, MemoryListNode> offsetHandle = MapUtil.getOrPutDefault(queueOffsetHandle, move.queueId, new ConcurrentHashMap<>());
+            Map<Integer, Map<Long, MemoryListNode>> queueOffsetHandle = MapUtil.getOrPutDefault(topicQueueOffsetHandle, move.topic, new HashMap<>());
+            Map<Long, MemoryListNode> offsetHandle = MapUtil.getOrPutDefault(queueOffsetHandle, move.queueId, new HashMap<>());
             // 尝试调度入aep
             for (long offset:offsetDataMap.keySet()) {
                 byte[] b = offsetDataMap.get(offset);

@@ -3,6 +3,11 @@ package test;
 import io.openmessaging.dramcache.DRAMCache;
 
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.concurrent.ConcurrentHashMap;
 
 class Node {
@@ -29,8 +34,10 @@ class NodeTurn {
 
 
 public class test {
-    public static void main(String[] args) {
-       parallelDir();
+    public static void main(String[] args) throws IOException {
+        RandomAccessFile file =  new RandomAccessFile("", "rw");
+        MappedByteBuffer mmap = file.getChannel().map(FileChannel.MapMode.READ_WRITE, 0, 1024);
+
     }
     static void initCache(NodeTurn node){
         node.initCache();
