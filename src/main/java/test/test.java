@@ -12,6 +12,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 class Node {
     int i;
+
     Node(int i) {
         this.i = i;
     }
@@ -20,6 +21,7 @@ class Node {
 class NodeTurn {
     private DRAMCache cache = null;
     int flag = 0;
+
     void initCache() {
         if (flag == 0) {
             flag = 1;
@@ -32,12 +34,17 @@ class NodeTurn {
 }
 
 
-
 public class test {
     public static void main(String[] args) throws IOException {
-        RandomAccessFile file =  new RandomAccessFile("", "rw");
-        MappedByteBuffer mmap = file.getChannel().map(FileChannel.MapMode.READ_WRITE, 0, 1024);
-
+//        RandomAccessFile file =  new RandomAccessFile("", "rw");
+//        MappedByteBuffer mmap = file.getChannel().map(FileChannel.MapMode.READ_WRITE, 0, 1024);
+        Thread thread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                System.out.println(Thread.currentThread().getName().split("-")[1]);
+            }
+        });
+        thread.start();
     }
     static void initCache(NodeTurn node){
         node.initCache();

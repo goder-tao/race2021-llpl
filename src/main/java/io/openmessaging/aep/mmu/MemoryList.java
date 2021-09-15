@@ -2,7 +2,9 @@ package io.openmessaging.aep.mmu;
 
 /**
  * 双链表管理空间的使用情况
- * @author tao */
+ *
+ * @author tao
+ */
 public class MemoryList {
     public MemoryListNode presentNode;
 

@@ -1,24 +1,23 @@
 package io.openmessaging.aep.util;
 
-import io.openmessaging.aep.mmu.PMemMMU;
 import com.intel.pmem.llpl.MemoryBlock;
+import io.openmessaging.aep.mmu.PMemMMU;
 import io.openmessaging.constant.MntPath;
 import io.openmessaging.constant.StorageSize;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 
 /**
- * 一块指定大小可以直接操作的aep block*/
+ * 一块指定大小可以直接操作的aep block
+ */
 public class PmemBlock implements PmemWriter, PmemReader {
     private final PMemMMU pMemMMU;
     private final Logger logger = LogManager.getLogger(PmemBlock.class.getName());
     private final long size;
+
     public PmemBlock(String path, long size) {
         pMemMMU = new PMemMMU(path, size);
         this.size = size;
@@ -28,7 +27,7 @@ public class PmemBlock implements PmemWriter, PmemReader {
     public byte[] read(long handle) {
         MemoryBlock block = pMemMMU.getBlock(handle);
         if (block == null) return null;
-        byte[] b = new byte[(int)block.size()];
+        byte[] b = new byte[(int) block.size()];
 
         block.copyToArray(0, b, 0, b.length);
 
@@ -44,7 +43,7 @@ public class PmemBlock implements PmemWriter, PmemReader {
     public ByteBuffer readData(long handle) {
         MemoryBlock block = pMemMMU.getBlock(handle);
         if (block == null) return null;
-        ByteBuffer buffer = ByteBuffer.allocate((int)block.size());
+        ByteBuffer buffer = ByteBuffer.allocate((int) block.size());
         byte[] b = new byte[(int) block.size()];
         block.copyToArray(0, b, 0, b.length);
         buffer.put(b);
@@ -94,7 +93,7 @@ public class PmemBlock implements PmemWriter, PmemReader {
         flushTime = System.nanoTime();
 
         System.out.printf("allocating time: %d, copy time: %d, flush time: %d\n",
-                (allTime-sTime), (copyTime-allTime), (flushTime-copyTime));
+                (allTime - sTime), (copyTime - allTime), (flushTime - copyTime));
         return block.handle();
     }
 
@@ -107,18 +106,18 @@ public class PmemBlock implements PmemWriter, PmemReader {
     }
 
     public static void main(String[] args) throws IOException {
-        PmemBlock block = new PmemBlock(MntPath.AEP_PATH+"test", StorageSize.MB*80);
+        PmemBlock block = new PmemBlock(MntPath.AEP_PATH + "test", StorageSize.MB * 80);
         int T = 2000;
         long sumTime = 0;
         // 使用 byte[]写
-        byte b[] = new byte[(int) (StorageSize.KB*8)];
+        byte b[] = new byte[(int) (StorageSize.KB * 8)];
         ByteBuffer buffer = ByteBuffer.allocate((int) (StorageSize.KB));
 
         for (int i = 0; i < T; i++) {
             long t = System.nanoTime();
             block.writeData(buffer);
-            sumTime += System.nanoTime()-t;
-            System.out.println("Write time: "+(System.nanoTime()-t)+"ns");
+            sumTime += System.nanoTime() - t;
+            System.out.println("Write time: " + (System.nanoTime() - t) + "ns");
         }
 
         // 使用ByteBuffer写
@@ -129,6 +128,6 @@ public class PmemBlock implements PmemWriter, PmemReader {
 //            System.out.println("Write time: "+(System.nanoTime()-t)+"ns");
 //        }
 
-        System.out.println("Average write time: "+(sumTime/T)+"ns");
+        System.out.println("Average write time: " + (sumTime / T) + "ns");
     }
 }
