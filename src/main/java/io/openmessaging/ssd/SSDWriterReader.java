@@ -8,9 +8,7 @@ import io.openmessaging.util.PartitionMaker;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.RandomAccessFile;
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
@@ -45,7 +43,20 @@ public class SSDWriterReader implements DiskReader, DiskWriter {
 
     //
     @Override
-    public int append(String dirPath, String fileName, ByteBuffer buffer) {
+    public int append(String dirPath, String fileName, byte[] data) {
+        try {
+            File dir = new File(dirPath);
+            if (!dir.exists()) {
+                dir.mkdirs();
+            }
+            BufferedOutputStream file = new BufferedOutputStream(new FileOutputStream(dirPath+fileName));
+            file.write(data);
+            file.flush();
+            file.close();
+        } catch (Exception e) {
+            logger.error("Append to disk error,"+e.toString());
+            return StatusCode.ERROR;
+        }
         return StatusCode.SUCCESS;
     }
 
@@ -61,6 +72,25 @@ public class SSDWriterReader implements DiskReader, DiskWriter {
             byte[] b = buffer.array();
             file.seek(offset);
             file.write(b);
+
+            file.close();
+        } catch (Exception e) {
+            logger.error("Write to disk fail, " + e.toString());
+            return StatusCode.ERROR;
+        }
+        return StatusCode.SUCCESS;
+    }
+
+    public int write(String dirPath, String fileName, long offset, byte[] data) {
+        try {
+            File dir = new File(dirPath);
+            if (!dir.exists()) {
+                dir.mkdirs();
+            }
+            RandomAccessFile file = new RandomAccessFile(dirPath + fileName, "rwd");
+
+            file.seek(offset);
+            file.write(data);
 
             file.close();
         } catch (Exception e) {
