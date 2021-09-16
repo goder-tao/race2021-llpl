@@ -46,28 +46,6 @@ public class SSDWriterReader implements DiskReader, DiskWriter {
     //
     @Override
     public int append(String dirPath, String fileName, ByteBuffer buffer) {
-//        try {
-//            File f = new File(dirPath);
-//            if (!f.exists()) {
-//                boolean b = f.mkdirs();
-//                if (!b) {
-//                    logger.error("Create dir fail!!");
-//                }
-//            }
-//            RandomAccessFile file = new RandomAccessFile(dirPath + fileName, "rw");
-//
-//            byte b[] = buffer.array();
-//
-//            buffer.rewind();
-//            FileChannel channel = file.getChannel();
-//            ByteBuffer puter = channel.map(FileChannel.MapMode.READ_WRITE, file.length(), buffer.capacity());
-//            puter.put(buffer);
-//            channel.close();
-//            file.close();
-//        } catch (Exception e) {
-//            logger.error("Write to disk fail, " + e.toString());
-//            return StatusCode.ERROR;
-//        }
         return StatusCode.SUCCESS;
     }
 

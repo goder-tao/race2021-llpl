@@ -1,5 +1,7 @@
 package io.openmessaging.util;
 
+import io.openmessaging.constant.DataFileBasicInfo;
+
 public class PartitionMaker {
     /**
      * 生成分区的文件名, 1->00100000...,作为data file和index file的名字
@@ -10,9 +12,13 @@ public class PartitionMaker {
      */
     public static String makePartitionPath(int partition, int len, int base) {
         StringBuilder s = new StringBuilder(partition * base + "");
-        for (int i = 0; i < len - s.length(); i++) {
+        for (int i = s.length(); i < len; i++) {
             s.insert(0, "0");
         }
         return s.toString();
+    }
+
+    public static void main(String[] args) {
+        System.out.println(makePartitionPath(1, DataFileBasicInfo.FILE_NAME_LENGTH, DataFileBasicInfo.ITEM_NUM));
     }
 }
