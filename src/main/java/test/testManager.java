@@ -60,7 +60,7 @@ public class testManager {
     static void testDRAMCache() {
         long memoryBefore = SystemMemory.getSystemAvailableMemory();
         long currentTime = System.currentTimeMillis();
-        DRAMCache cache = DRAMCache.createOrGetCache();
+        DRAMCache cache = new DRAMCache();
         for (int i = 0; i < 10000; i++) {
             ByteBuffer data = ByteBuffer.allocate((int) StorageSize.MB);
             if (cache.isCacheAvailable()) {

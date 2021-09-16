@@ -25,7 +25,7 @@ class NodeTurn {
     void initCache() {
         if (flag == 0) {
             flag = 1;
-            cache = DRAMCache.createOrGetCache();
+
         }
         if (cache == null) {
             System.out.println("Cache is null");
