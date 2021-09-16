@@ -1,13 +1,18 @@
 package test;
 
+import io.openmessaging.constant.MntPath;
+import io.openmessaging.constant.StorageSize;
 import io.openmessaging.dramcache.DRAMCache;
+import io.openmessaging.ssd.SSDWriterReader;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 
 class Node {
@@ -36,16 +41,25 @@ class NodeTurn {
 
 public class test {
     public static void main(String[] args) throws IOException {
-//        RandomAccessFile file =  new RandomAccessFile("", "rw");
-//        MappedByteBuffer mmap = file.getChannel().map(FileChannel.MapMode.READ_WRITE, 0, 1024);
-        Thread thread = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                System.out.println(Thread.currentThread().getName().split("-")[1]);
-            }
-        });
-        thread.start();
+        SSDWriterReader ssdWriterReader = new SSDWriterReader();
+        for (int i = 0; i < 10; i++) {
+            Thread thread = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    Random random = new Random();
+                    long startTime = System.nanoTime();
+                    int fi = random.nextInt(10000);
+                    for (int i = 0; i < 10000; i++) {
+                        ssdWriterReader.append(MntPath.SSD_PATH, "test"+fi, ByteBuffer.allocate((int) StorageSize.KB).array());
+                    }
+                    System.out.println("Average write time: "+(System.nanoTime()-startTime)/10000+"ns");
+                }
+            });
+            thread.start();
+        }
+
     }
+
     static void initCache(NodeTurn node){
         node.initCache();
         for (int i = 0; i < 10000; i++) {

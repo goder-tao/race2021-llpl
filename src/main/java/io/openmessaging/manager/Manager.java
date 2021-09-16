@@ -98,30 +98,38 @@ public class Manager {
         indexData.putShort((short) data.capacity());
 
         // 多线程双写, buffer并发不安全
-        ByteBuffer b1 = ByteBufferUtil.copyFrom(data);
-        ByteBuffer b2 = ByteBufferUtil.copyFrom(data);
+//        ByteBuffer b1 = ByteBufferUtil.copyFrom(data);
+//        ByteBuffer b2 = ByteBufferUtil.copyFrom(data);
 
         // .index .data并发双写
         Thread writeSSDData = new Thread(new Runnable() {
             @Override
             public void run() {
-                int writeStatus = ssdWriterReader.write(MntPath.SSD_PATH + topic + "/" + queueId + "/", partitionPath + ".data", dataOffset, b2);
+                int writeStatus = ssdWriterReader.append(MntPath.SSD_PATH + topic + "/" + queueId + "/", partitionPath + ".data", data.array());
             }
         }), writeSSDIndex = new Thread(new Runnable() {
             @Override
             public void run() {
-                int writeStatus = ssdWriterReader.write(MntPath.SSD_PATH + topic + "/" + queueId + "/", partitionPath + ".index", indexOffsetC * 10, indexData);
+                int writeStatus = ssdWriterReader.append(MntPath.SSD_PATH + topic + "/" + queueId + "/", partitionPath + ".index",indexData.array());
             }
         });
         writeSSDData.start();
         writeSSDIndex.start();
+
+        try {
+            writeSSDData.join();
+            writeSSDIndex.join();
+        } catch (Exception e) {
+            logger.error("Write SSD thread: " + e.toString());
+            return -1L;
+        }
 
         write2DiskTime = System.nanoTime();
 
         // 分阶段
         if (!isStageChanged.get()) {  // 第一阶段
             // 尝试写aep
-            FutureTask<MemoryListNode> writePMemFutureTask = new FutureTask<>(() -> writePMemOnly(coolBlock, b1, tName));
+            FutureTask<MemoryListNode> writePMemFutureTask = new FutureTask<>(() -> writePMemOnly(coolBlock, data.array(), tName));
             Thread writePMem = new Thread(writePMemFutureTask);
             writePMem.start();
             try {
@@ -173,7 +181,7 @@ public class Manager {
                 if (dramCache != null && dramCache.isCacheAvailable()) {  // 缓存在dram
                     dramCache.put(topic + queueId, appendOffset, data);
                 } else {  // 缓存在aep
-                    MemoryListNode memoryListNode = writePMemOnly(hotBlock, data, tName);
+                    MemoryListNode memoryListNode = writePMemOnly(hotBlock, data.array(), tName);
                     // 写入aep成功
                     if (memoryListNode != null) {
                         Map<Integer, Map<Long, MemoryListNode>> queueOffsetHandle = MapUtil.getOrPutDefault(hotTopicQueueOffsetHandle, topic, new HashMap<>());
@@ -184,25 +192,18 @@ public class Manager {
             }
         }
 
-//        if (pmemIOTIme != 0) {
-//            sumAppendTime.addAndGet(pmemIOTIme - sTime);
-//            sumMapTime.addAndGet(mapTime - sTime);
-//            sumPMemIO.addAndGet(pmemIOTIme - write2DiskTime);
-//            sumDiskIO.addAndGet(write2DiskTime - mapTime);
-//            System.out.printf("Append spend time: %dns, map time: %dns, pmem io time: %dns, disk io time: %dns\n" +
-//                            "Spend time - map time: %f%%, pmem io: %f%%, hdd io: %f%%\n\n",
-//                    pmemIOTIme - sTime, mapTime - sTime, pmemIOTIme - write2DiskTime, write2DiskTime - mapTime,
-//                    (double) sumMapTime.get() / sumAppendTime.get(), (double) sumPMemIO.get() / sumAppendTime.get(),
-//                    (double) sumDiskIO.get() / sumAppendTime.get());
-//        }
-
-        try {
-            writeSSDData.join();
-            writeSSDIndex.join();
-        } catch (Exception e) {
-            logger.error("Write SSD thread: " + e.toString());
-            return -1L;
+        if (pmemIOTIme != 0) {
+            sumAppendTime.addAndGet(pmemIOTIme - sTime);
+            sumMapTime.addAndGet(mapTime - sTime);
+            sumPMemIO.addAndGet(pmemIOTIme - write2DiskTime);
+            sumDiskIO.addAndGet(write2DiskTime - mapTime);
+            System.out.printf("Append spend time: %dns, map time: %dns, pmem io time: %dns, disk io time: %dns\n" +
+                            "Spend time - map time: %f%%, pmem io: %f%%, hdd io: %f%%\n\n",
+                    pmemIOTIme - sTime, mapTime - sTime, pmemIOTIme - write2DiskTime, write2DiskTime - mapTime,
+                    (double) sumMapTime.get() / sumAppendTime.get(), (double) sumPMemIO.get() / sumAppendTime.get(),
+                    (double) sumDiskIO.get() / sumAppendTime.get());
         }
+
         return appendOffset;
     }
 
@@ -261,8 +262,8 @@ public class Manager {
      *
      * @return: handle of allocated MemoryBlock
      */
-    MemoryListNode writePMemOnly(PMemSpace space, ByteBuffer data, String tName) {
-        return space.write(data.array(), tName);
+    MemoryListNode writePMemOnly(PMemSpace space, byte[] data, String tName) {
+        return space.write(data, tName);
     }
 
     /**
