@@ -96,6 +96,7 @@ public class Manager {
         ByteBuffer indexData = ByteBuffer.allocate(10);
         indexData.putLong(dataOffset);
         indexData.putShort((short) data.capacity());
+        ByteBuffer b1 = ByteBufferUtil.copyFrom(data);
 
         // 多线程双写, buffer并发不安全
 //        ByteBuffer b1 = ByteBufferUtil.copyFrom(data);
@@ -105,7 +106,7 @@ public class Manager {
         Thread writeSSDData = new Thread(new Runnable() {
             @Override
             public void run() {
-                int writeStatus = ssdWriterReader.append(MntPath.SSD_PATH + topic + "/" + queueId + "/", partitionPath + ".data", data.array());
+                int writeStatus = ssdWriterReader.append(MntPath.SSD_PATH + topic + "/" + queueId + "/", partitionPath + ".data", b1.array());
             }
         }), writeSSDIndex = new Thread(new Runnable() {
             @Override
@@ -129,7 +130,7 @@ public class Manager {
         // 分阶段
         if (!isStageChanged.get()) {  // 第一阶段
             // 尝试写aep
-            FutureTask<MemoryListNode> writePMemFutureTask = new FutureTask<>(() -> writePMemOnly(coolBlock, data.array(), tName));
+            FutureTask<MemoryListNode> writePMemFutureTask = new FutureTask<>(() -> writePMemOnly(coolBlock, b1.array(), tName));
             Thread writePMem = new Thread(writePMemFutureTask);
             writePMem.start();
             try {
