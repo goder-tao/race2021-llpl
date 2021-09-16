@@ -22,7 +22,7 @@ public class SSDWriterReader implements DiskReader, DiskWriter {
     public ByteBuffer read(String path, long offset, int size) {
         ByteBuffer data = null;
         try {
-            RandomAccessFile file = new RandomAccessFile(path, "rw");
+            RandomAccessFile file = new RandomAccessFile(path, "r");
             long fl = file.length();
             // 超出文件范围
             if (offset >= fl) {
@@ -56,7 +56,7 @@ public class SSDWriterReader implements DiskReader, DiskWriter {
             if (!dir.exists()) {
                 dir.mkdirs();
             }
-            RandomAccessFile file = new RandomAccessFile(dirPath + fileName, "rw");
+            RandomAccessFile file = new RandomAccessFile(dirPath + fileName, "rwd");
 
             byte[] b = buffer.array();
             file.seek(offset);

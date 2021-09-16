@@ -8,8 +8,10 @@ import org.apache.log4j.Logger;
 import sun.misc.Lock;
 
 import java.nio.ByteBuffer;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 
 public class DRAMCache {
@@ -24,58 +26,49 @@ public class DRAMCache {
     private long currentMemory = 0L;
     // 内存监视频率(100ms)
     private final int freq = 100;
-    // 单例
-    private volatile static DRAMCache cache;
+    // 单次
+    private AtomicBoolean startDetect = new AtomicBoolean(false);
 
-    private DRAMCache() {
+    public DRAMCache() {
         currentMemory = SystemMemory.getSystemAvailableMemory();
-        updateAvailableMemory = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                while (true) {
-                    currentMemory = SystemMemory.getSystemAvailableMemory();
-                    try {
-                        Thread.sleep(freq);
-                    } catch (Exception e) {
-                        System.out.println(e.toString());
-                    }
-                }
-            }
-        });
-        updateAvailableMemory.start();
+
     }
 
-    private static Lock lock = new Lock();
-
-    /**
-     * 单例模式
-     */
-    public static DRAMCache createOrGetCache() {
-        if (cache == null) {
-            synchronized (DRAMCache.class) {
-                if (cache == null) {
-                    cache = new DRAMCache();
+    public void startDetect() {
+        if (!startDetect.get()) {
+            startDetect.set(true);
+            updateAvailableMemory = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    while (true) {
+                        currentMemory = SystemMemory.getSystemAvailableMemory();
+                        try {
+                            Thread.sleep(freq);
+                        } catch (Exception e) {
+                            System.out.println(e.toString());
+                        }
+                    }
                 }
-            }
+            });
+            updateAvailableMemory.start();
         }
-        return cache;
     }
 
     public void put(String topicAndQId, long off, ByteBuffer v) {
         v.rewind();
-        Map<Long, ByteBuffer> map = MapUtil.getOrPutDefault(cacheMap, topicAndQId, new ConcurrentHashMap<>());
+        Map<Long, ByteBuffer> map = MapUtil.getOrPutDefault(cacheMap, topicAndQId, new HashMap<>());
         map.put(off, v);
     }
 
     public ByteBuffer getAndRemove(String topicAndQId, long off) {
-        Map<Long, ByteBuffer> map = MapUtil.getOrPutDefault(cacheMap, topicAndQId, new ConcurrentHashMap<>());
+        Map<Long, ByteBuffer> map = MapUtil.getOrPutDefault(cacheMap, topicAndQId, new HashMap<>());
         ByteBuffer data = map.get(off);
         map.remove(off);
         return data;
     }
 
     public void remove(String topicAndQId, long off) {
-        Map<Long, ByteBuffer> map = MapUtil.getOrPutDefault(cacheMap, topicAndQId, new ConcurrentHashMap<>());
+        Map<Long, ByteBuffer> map = MapUtil.getOrPutDefault(cacheMap, topicAndQId, new HashMap<>());
         map.remove(off);
     }
 

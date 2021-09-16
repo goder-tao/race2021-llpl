@@ -47,7 +47,7 @@ public class Manager {
     // lock definition
     private final Lock writeLock = new Lock();
     // memory cache
-    private volatile DRAMCache dramCache;
+    private volatile DRAMCache dramCache = new DRAMCache();
     private AtomicBoolean isStageChanged = new AtomicBoolean(false);
 
     public Manager() {
@@ -167,7 +167,7 @@ public class Manager {
             PriorityListNode node = coldQueueMap.getOrDefault(queueId, null);
             // 冷热队列判断, 不再有新的队列加入进来, 热队列会被删掉, 根据null值判队列冷热
             if (node == null) {  // 热队列
-                if (dramCache.isCacheAvailable()) {  // 缓存在dram
+                if (dramCache != null && dramCache.isCacheAvailable()) {  // 缓存在dram
                     dramCache.put(topic + queueId, appendOffset, data);
                 } else {  // 缓存在aep
                     MemoryListNode memoryListNode = writePMemOnly(hotBlock, data, tName);
@@ -211,9 +211,8 @@ public class Manager {
             hotBlock.changeStage();
             isStageChanged.set(true);
             scheduler.run();
+            dramCache.startDetect();
         }
-
-        dramCache = DRAMCache.createOrGetCache();
 
         // 返回结果
         Map<Integer, ByteBuffer> dataMap;
