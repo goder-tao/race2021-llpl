@@ -20,10 +20,12 @@ public class PMemPartitionSpace implements Space {
     private final PMemMMU2 mmu;
     private final PMemReaderWriter readerWriter;
     private final byte partition;
-
-    public PMemPartitionSpace(MemoryBlock memoryBlock, byte partition) {
+    private final  String tName;
+    public PMemPartitionSpace(MemoryBlock memoryBlock, byte partition, String tName) {
         this.mainBlock = memoryBlock;
+        this.tName = tName;
         mmu = new PMemMMU2(mainBlock.size());
+        mmu.memoryList.presentNode.tName = tName;
         readerWriter = new PMemReaderWriter(mainBlock);
         this.size = mainBlock.size();
         this.partition = partition;
@@ -43,8 +45,6 @@ public class PMemPartitionSpace implements Space {
         if (listNode != null) {
             readerWriter.write(listNode.blockOffset, data);
             listNode.partiotion = partition;
-        } else {
-            
         }
         return listNode;
     }

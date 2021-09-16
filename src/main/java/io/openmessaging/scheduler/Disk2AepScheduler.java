@@ -103,7 +103,7 @@ public class Disk2AepScheduler {
                 if (handle != null) {  // 分配空间成功，保存
                     offsetHandle.put(offset, handle);
                 } else {  // 分配空间失败，空间不足，修改tailOffset,退出
-                    logger.info("Aep full, queue scheduling exist");
+                    logger.info("Aep full, queue scheduling exit");
                     move.tailOffset.set(offset);
                     break;
                 }

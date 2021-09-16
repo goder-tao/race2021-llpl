@@ -46,7 +46,7 @@ public class PMemSpace implements Space {
         MemoryListNode listNode;
         PmemThreadSpace threadSpace = threadSpaceMap.get(tName);
         if (threadSpace == null) {
-            threadSpace = new PmemThreadSpace(heap);
+            threadSpace = new PmemThreadSpace(heap, tName);
             threadSpace.setStage(this.stage);
             threadSpaceMap.put(tName, threadSpace);
         }

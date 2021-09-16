@@ -13,9 +13,9 @@ import java.util.concurrent.ConcurrentLinkedDeque;
  * @author tao
  */
 public class PMemMMU2 implements MMU2 {
-    private final MemoryList memoryList;
-    private Lock lock = new Lock();
-    private Logger logger = LogManager.getLogger(PMemMMU.class.getName());
+    public final MemoryList memoryList;
+    private final Lock lock = new Lock();
+    private final Logger logger = LogManager.getLogger(PMemMMU.class.getName());
     private ConcurrentLinkedDeque<MemoryListNode> memoryLists = new ConcurrentLinkedDeque<>();
 
     public PMemMMU2(long size) {
@@ -61,6 +61,7 @@ public class PMemMMU2 implements MMU2 {
             MemoryListNode flag = memoryList.presentNode;
             MemoryListNode move = memoryList.presentNode;
 
+            // 遍历，寻找未使用且大小合适的MemoryBlock空间
             while (move.used || move.blockSize < size) {
                 move = move.nextNode;
                 if (move == flag) {
@@ -89,9 +90,4 @@ public class PMemMMU2 implements MMU2 {
             lock.unlock();
         }
     }
-
-    public void setPosition(MemoryListNode memoryListNode) {
-        memoryList.presentNode = memoryListNode;
-    }
-
 }

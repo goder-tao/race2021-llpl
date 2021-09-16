@@ -25,10 +25,13 @@ public class PmemThreadSpace implements Space {
     // 阶段标记, 先向heap请求分配至heap满，满了之后再循环再已分配的partition中寻找合适的空间存储
     private byte stage = 1;
     private boolean full = false;
-    public PmemThreadSpace(Heap heap) {
+    // 线程名称
+    private final String tName;
+    public PmemThreadSpace(Heap heap, String tName) {
         this.heap = heap;
+        this.tName = tName;
         MemoryBlock firstBlock = heap.allocateMemoryBlock(StorageSize.DEFAULT_PARTITION_SIZE);
-        PMemPartitionSpace firstPartitionSpace = new PMemPartitionSpace(firstBlock, (byte) 0);
+        PMemPartitionSpace firstPartitionSpace = new PMemPartitionSpace(firstBlock, (byte) 0, tName);
         partitionSpacesList.add(firstPartitionSpace);
     }
 
@@ -57,7 +60,7 @@ public class PmemThreadSpace implements Space {
                 }
                 if (newBlock != null) {
                     currentPart.incrementAndGet();
-                    PMemPartitionSpace newPartitionSpace = new PMemPartitionSpace(newBlock, (byte) currentPart.get());
+                    PMemPartitionSpace newPartitionSpace = new PMemPartitionSpace(newBlock, (byte) currentPart.get(), tName);
                     partitionSpacesList.add(newPartitionSpace);
                     memoryListNode = newPartitionSpace.write(data);
                 }

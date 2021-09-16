@@ -9,7 +9,7 @@ public class MemoryList {
     public MemoryListNode presentNode;
 
     public MemoryList(long size, PMemMMU2 pMemMMU){
-        presentNode= new MemoryListNode(0, size, null, null, pMemMMU, Thread.currentThread().getName());
+        presentNode= new MemoryListNode(0, size, null, null, pMemMMU, "");
         presentNode.preNode = presentNode;
         presentNode.nextNode = presentNode;
         presentNode.changeState();
