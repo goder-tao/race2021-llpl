@@ -95,13 +95,8 @@ public class Manager {
         ByteBuffer indexData = ByteBuffer.allocate(10);
         indexData.putLong(dataOffset);
         indexData.putShort((short) data.capacity());
-
         ByteBuffer b1 = ByteBufferUtil.copyFrom(data);
-
-        // 多线程双写, buffer并发不安全
-//        ByteBuffer b1 = ByteBufferUtil.copyFrom(data);
-//        ByteBuffer b2 = ByteBufferUtil.copyFrom(data);
-
+        
         // .index .data并发双写
         Thread writeSSDData = new Thread(new Runnable() {
             @Override
