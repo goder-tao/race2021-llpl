@@ -96,7 +96,7 @@ public class Manager {
         indexData.putLong(dataOffset);
         indexData.putShort((short) data.capacity());
         ByteBuffer b1 = ByteBufferUtil.copyFrom(data);
-        
+
         // .index .data并发双写
         Thread writeSSDData = new Thread(new Runnable() {
             @Override

@@ -62,17 +62,18 @@ public class PMemUnit implements Space2 {
         int mark = lastPosition;
         int last = mark;
         // 开始遍历找空的entry
-        while ((last+1)%entryNum != mark) {
-            if (arrayFlag[last].compareAndSet(false, true)) {
+        do {
+            if (arrayFlag[last%entryNum].compareAndSet(false, true)) {
                 node = new MemoryNode();
-                node.entryPosition = last;
+                node.entryPosition = last%entryNum;
                 node.dataSize = (short) data.length;
-                PMemReaderWriter2.getInstance().write(block, last*entrySize, data);
+                PMemReaderWriter2.getInstance().write(block, node.entryPosition*entrySize, data);
                 currentEntry.incrementAndGet();
                 break;
             }
             last++;
-        }
+        } while (last%entryNum != mark);
+
         lastPosition = last+1;
         return node;
     }
