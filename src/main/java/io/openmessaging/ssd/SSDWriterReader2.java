@@ -110,6 +110,9 @@ public class SSDWriterReader2 implements DiskReader {
         }
         // 从ssd读数据
         ByteBuffer SSDData = read(MntPath.SSD_PATH + topic + "/" + queueId + "/" + partitionPath + ".data", SSDDataStartOffset, SSDReadBlockSize);
+        if (SSDData.capacity() != SSDReadBlockSize) {
+            logger.fatal("Read data size not equal, expected size: "+SSDReadBlockSize+", got: "+SSDData.capacity());
+        }
         for (int i = 0; i < size.length; i++) {
             byte[] bytes = new byte[size[i]];
             SSDData.get(bytes);
