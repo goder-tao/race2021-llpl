@@ -50,7 +50,7 @@ public class PMemMMU2 implements MMU2 {
     }
 
     /**
-     * 使用下次最差算法在MeoryList中寻找空间合适的存储空间，标记对应node为使用，如果有剩余空间，
+     * 使用next fit算法在MeoryList中寻找空间合适的存储空间，标记对应node为使用，如果有剩余空间，
      * 需要新建一个node标记为未使用，更新新node的offset和size。保证MemoryList的并发安全
      */
     @Override

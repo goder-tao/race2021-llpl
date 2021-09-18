@@ -1,6 +1,6 @@
 package test;
 
-import io.openmessaging.aep.util.PMemSpace;
+import io.openmessaging.aep.space.PMemSpace;
 import io.openmessaging.constant.MntPath;
 import io.openmessaging.constant.StorageSize;
 import io.openmessaging.dramcache.DRAMCache;
@@ -13,10 +13,13 @@ import java.util.Map;
 
 public class testManager {
     public static void main(String[] args) {
+        testParallel();
+    }
 
+    /**
+     * 并发写，并发读*/
+    static void testParallel() {
         Manager manager = new Manager();
-//        testParallelWrite(manager, "test", 0, 0, 40);
-//        testSequentRead(manager, "test", 0, 0, 40);
         Thread thread = new Thread(new Runnable() {
             @Override
             public void run() {

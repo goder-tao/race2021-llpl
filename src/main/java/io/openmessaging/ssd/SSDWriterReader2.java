@@ -3,18 +3,33 @@ package io.openmessaging.ssd;
 import io.openmessaging.constant.DataFileBasicInfo;
 import io.openmessaging.constant.MntPath;
 import io.openmessaging.constant.StatusCode;
-import io.openmessaging.constant.StorageSize;
+import io.openmessaging.util.MapUtil;
 import io.openmessaging.util.PartitionMaker;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
-import java.io.*;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
-public class SSDWriterReader implements DiskReader, DiskWriter {
-    private Logger logger = LogManager.getLogger(SSDWriterReader.class.getName());
+public class SSDWriterReader2 implements DiskReader {
+    // 保存文件输出流对象
+    private static ConcurrentHashMap<String, Map<Integer, Map<String, BufferedOutputStream>>> topicQueueFileNameMap = new ConcurrentHashMap<>();
+
+    private static Logger logger = LogManager.getLogger(SSDWriterReader2.class.getName());
+
+    private static SSDWriterReader2 instance = new SSDWriterReader2();
+
+
+    // 单例模式
+    private SSDWriterReader2() {
+
+    }
 
     @Override
     public ByteBuffer read(String path, long offset, int size) {
@@ -41,60 +56,26 @@ public class SSDWriterReader implements DiskReader, DiskWriter {
         return data;
     }
 
-
-    @Override
-    public int append(String dirPath, String fileName, byte[] data) {
+    /**
+     * 将打开的OutputStream对象保存下来，减少因为频繁打开关闭文件流带来的开销*/
+    public int append(String mntPath, String topic, int qID, String fileName, byte[] data) {
         try {
-            File dir = new File(dirPath);
+            File dir = new File(mntPath+topic+"/"+qID+"/");
             if (!dir.exists()) {
                 dir.mkdirs();
             }
-            BufferedOutputStream file = new BufferedOutputStream(new FileOutputStream(dirPath+fileName));
+            Map<Integer, Map<String, BufferedOutputStream>> queueFileNameMap = MapUtil.getOrPutDefault(topicQueueFileNameMap, topic, new HashMap<>());
+            Map<String, BufferedOutputStream> fileNameMap = MapUtil.getOrPutDefault(queueFileNameMap, qID, new HashMap<>());
+
+            BufferedOutputStream file = fileNameMap.get(fileName);
+            if (file == null) {
+                file = new BufferedOutputStream(new FileOutputStream(mntPath+topic+"/"+qID+"/"+fileName));
+                fileNameMap.put(fileName, file);
+            }
             file.write(data);
             file.flush();
-            file.close();
         } catch (Exception e) {
             logger.error("Append to disk error,"+e.toString());
-            return StatusCode.ERROR;
-        }
-        return StatusCode.SUCCESS;
-    }
-
-    @Override
-    public int write(String dirPath, String fileName, long offset, ByteBuffer buffer) {
-        try {
-            File dir = new File(dirPath);
-            if (!dir.exists()) {
-                dir.mkdirs();
-            }
-            RandomAccessFile file = new RandomAccessFile(dirPath + fileName, "rwd");
-
-            byte[] b = buffer.array();
-            file.seek(offset);
-            file.write(b);
-
-            file.close();
-        } catch (Exception e) {
-            logger.error("Write to disk fail, " + e.toString());
-            return StatusCode.ERROR;
-        }
-        return StatusCode.SUCCESS;
-    }
-
-    public int write(String dirPath, String fileName, long offset, byte[] data) {
-        try {
-            File dir = new File(dirPath);
-            if (!dir.exists()) {
-                dir.mkdirs();
-            }
-            RandomAccessFile file = new RandomAccessFile(dirPath + fileName, "rwd");
-
-            file.seek(offset);
-            file.write(data);
-
-            file.close();
-        } catch (Exception e) {
-            logger.error("Write to disk fail, " + e.toString());
             return StatusCode.ERROR;
         }
         return StatusCode.SUCCESS;
@@ -137,31 +118,8 @@ public class SSDWriterReader implements DiskReader, DiskWriter {
         return map;
     }
 
-    public static void main(String[] args) throws IOException {
-        SSDWriterReader ssdWriterReader = new SSDWriterReader();
-        int T = 10000;
-        long sumTime = 0;
-        ByteBuffer buffer = ByteBuffer.allocate((int) (StorageSize.KB * 8));
-        byte[] b = new byte[(int) (StorageSize.KB * 8)];
-
-        RandomAccessFile file;
-        for (int i = 0; i < T; i++) {
-            long t = System.nanoTime();
-            file = new RandomAccessFile("/home/tao/Data/test", "rw");
-            file.seek(i * b.length);
-            file.write(buffer.array());
-            file.close();
-
-            sumTime += System.nanoTime() - t;
-            System.out.println("Write time: " + (System.nanoTime() - t) + "ns");
-        }
-
-        for (int i = 0; i < T; i++) {
-            long t = System.nanoTime();
-            ssdWriterReader.write("/home/tao/Data/", "test", i * buffer.capacity(), buffer);
-            sumTime += System.nanoTime() - t;
-            System.out.println("Write time: " + (System.nanoTime() - t) + "ns");
-        }
-        System.out.println("Average write time: " + (sumTime / T) + "ns");
+    public static SSDWriterReader2 getInstance() {
+        return instance;
     }
+
 }

@@ -1,12 +1,10 @@
-package io.openmessaging.aep.util;
+package io.openmessaging.aep.space;
 
 import com.intel.pmem.llpl.Heap;
 import io.openmessaging.aep.mmu.MemoryListNode;
-import io.openmessaging.constant.StorageSize;
 
 import java.nio.ByteBuffer;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * 创建一个较大的空间的Heap，建立当前线程和对应PmemThreadSpace的映射，将具体的操作下放到
@@ -24,7 +22,6 @@ public class PMemSpace implements Space {
         boolean initialized = Heap.exists(path);
         heap = initialized ? Heap.openHeap(path) : Heap.createHeap(path, size);
         this.size = heap.size();
-
     }
 
     @Override

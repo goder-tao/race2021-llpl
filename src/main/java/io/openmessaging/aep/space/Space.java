@@ -1,4 +1,4 @@
-package io.openmessaging.aep.util;
+package io.openmessaging.aep.space;
 
 import io.openmessaging.aep.mmu.MemoryListNode;
 

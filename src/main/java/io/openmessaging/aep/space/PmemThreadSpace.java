@@ -1,4 +1,4 @@
-package io.openmessaging.aep.util;
+package io.openmessaging.aep.space;
 
 import com.intel.pmem.llpl.Heap;
 import com.intel.pmem.llpl.MemoryBlock;

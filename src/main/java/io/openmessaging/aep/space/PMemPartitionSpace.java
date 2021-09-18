@@ -1,8 +1,9 @@
-package io.openmessaging.aep.util;
+package io.openmessaging.aep.space;
 
 import com.intel.pmem.llpl.MemoryBlock;
 import io.openmessaging.aep.mmu.MemoryListNode;
 import io.openmessaging.aep.mmu.PMemMMU2;
+import io.openmessaging.aep.util.PMemReaderWriter;
 
 import java.nio.ByteBuffer;
 

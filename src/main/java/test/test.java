@@ -14,33 +14,55 @@ import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
-
-class Node {
-    int i;
-
-    Node(int i) {
-        this.i = i;
-    }
-}
-
-class NodeTurn {
-    private DRAMCache cache = null;
-    int flag = 0;
-
-    void initCache() {
-        if (flag == 0) {
-            flag = 1;
-
-        }
-        if (cache == null) {
-            System.out.println("Cache is null");
-        }
-    }
-}
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 
 public class test {
     public static void main(String[] args) throws IOException {
+        atomicTest();
+    }
+
+    static void atomicTest() {
+        AtomicBoolean atomicBoolean = new AtomicBoolean(false);
+        final int[]  i = new int[1];
+        for (int j = 0; j < 1000000; j++) {
+            atomicBoolean.set(false);
+            i[0] = 0;
+            Thread thread = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    if (atomicBoolean.compareAndSet(false, true)) {
+                        atomicBoolean.set(true);
+                        i[0]++;
+                    }
+                }
+            }), thread1 = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    if (atomicBoolean.compareAndSet(false, true)) {
+                        atomicBoolean.set(true);
+                        i[0]++;
+                    }
+                }
+            });
+            try {
+                thread.start();
+                thread1.start();
+                thread1.join();
+                thread.join();
+            } catch (Exception e) {
+                System.out.println(e.toString());
+            }
+            if (i[0] == 2) {
+                System.out.println("!!!");
+            }
+        }
+    }
+
+    /**
+     * 并发写磁盘*/
+    static void diskPressureTest() {
         SSDWriterReader ssdWriterReader = new SSDWriterReader();
         for (int i = 0; i < 10; i++) {
             Thread thread = new Thread(new Runnable() {
@@ -57,15 +79,8 @@ public class test {
             });
             thread.start();
         }
-
     }
 
-    static void initCache(NodeTurn node){
-        node.initCache();
-        for (int i = 0; i < 10000; i++) {
-            test();
-        }
-    }
 
     public static void test() {
         ConcurrentHashMap<Integer, Integer> map = new ConcurrentHashMap<>();
