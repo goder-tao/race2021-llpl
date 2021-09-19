@@ -67,8 +67,8 @@ public class SSDWriterReader2 implements DiskReader {
             long fl = file.length();
             // 等待.data写完
             while (fl < offset+size) {
-                logger.info("waiting for data file writing, file length: "+fl+", expected length: "+offset+size);
-                Thread.sleep(2);
+                logger.info("waiting for data file writing, file length: "+fl+", expected offset: "+offset+", expected size: "+size);
+                Thread.sleep(50);
                 fl = file.length();
             }
 
