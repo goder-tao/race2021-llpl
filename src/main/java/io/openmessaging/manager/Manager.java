@@ -169,7 +169,7 @@ public class Manager {
                 if (dramCache != null && dramCache.isCacheAvailable()) {  // 缓存在dram
                     dramCache.put(topic + queueId, appendOffset, data);
                 } else {  // 缓存在aep
-                    MemoryNode memoryNode = writePMemOnly(hotBlock, data.array(), tName);
+                    MemoryNode memoryNode = writePMemOnly(hotBlock, b1.array(), tName);
                     // 写入aep成功
                     if (memoryNode != null) {
                         Map<Integer, Map<Long, MemoryNode>> queueOffsetHandle = MapUtil.getOrPutDefault(hotTopicQueueOffsetHandle, topic, new HashMap<>());
@@ -269,7 +269,6 @@ public class Manager {
         Map<Integer, ByteBuffer> dataMap = new HashMap<>();
         ByteBuffer data;
 
-
         Map<Long, MemoryNode> coldOffsetHandle = getOrNull(getOrNull(coldTopicQueueOffsetHandle, topic), queueId);
 
         int i;
@@ -305,13 +304,12 @@ public class Manager {
     Map<Integer, ByteBuffer> readHotQueueData(String topic, int queueId, long offset, int fetchNum) {
         Map<Integer, ByteBuffer> dataMap = new HashMap<>();
         ByteBuffer data;
+        if (dramCache == null) {
+            logger.fatal("DRAM cache is null");
+            return null;
+        }
 
         for (int i = 0; i < fetchNum; i++) {
-            if (dramCache == null) {
-                logger.fatal("DRAM cache is null");
-                return null;
-            }
-
             data = dramCache.getAndRemove(topic + queueId, offset + i);
             // 未缓存在dram中
             if (data == null) {

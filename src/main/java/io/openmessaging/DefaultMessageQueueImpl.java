@@ -13,7 +13,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     private final Manager manager;
 
     public DefaultMessageQueueImpl() {
-
         manager = new Manager();
     }
 

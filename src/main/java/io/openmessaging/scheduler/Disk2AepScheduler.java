@@ -1,6 +1,5 @@
 package io.openmessaging.scheduler;
 
-import io.openmessaging.aep.mmu.MemoryListNode;
 import io.openmessaging.aep.mmu.MemoryNode;
 import io.openmessaging.aep.space.PMemSpace2;
 import io.openmessaging.ssd.SSDWriterReader2;
@@ -32,7 +31,7 @@ public class Disk2AepScheduler {
     private Lock lock = new Lock();
     // 单例线程只开一次
     private Thread thread = null;
-    // 直接一次性预调度100数据
+    // 直接一次性预调度100条数据
     private final int fetchNum = 100;
 
     public Disk2AepScheduler(PMemSpace2 pmemBlock, ConcurrentHashMap<String, Map<Integer, Map<Long, MemoryNode>>> topicQueueOffsetHandle) {
@@ -104,7 +103,6 @@ public class Disk2AepScheduler {
                 if (handle != null) {  // 分配空间成功，保存
                     offsetHandle.put(offset, handle);
                 } else {  // 分配空间失败，空间不足，修改tailOffset,退出
-                    logger.info("Aep full, queue scheduling exit");
                     move.tailOffset.set(offset);
                     break;
                 }

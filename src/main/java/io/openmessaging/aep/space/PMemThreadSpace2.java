@@ -16,7 +16,7 @@ public class PMemThreadSpace2 implements Space2{
     // 每个线程pmem空间的槽
     // 每个槽表示的单项大小分别为136, 272, 544, 1088, 2176, 4352, 8704, 17408
     private ConcurrentHashMap<Integer, PMemUnit>[] slots = new ConcurrentHashMap[8];
-    // 生成每个槽map的key
+    // 生成每个槽map的key, 表示上次分配的Unit的key
     private AtomicInteger[] keys = new AtomicInteger[8];
     private int[] entrySizes = new int[8];
     private int[] entryNums = new int[8];
@@ -28,7 +28,7 @@ public class PMemThreadSpace2 implements Space2{
         this.pool = pool;
         for (int i = 0; i < 8; i++) {
             slots[i] = new ConcurrentHashMap<Integer, PMemUnit>();
-            keys[i] = new AtomicInteger(0);
+            keys[i] = new AtomicInteger(-1);
             entrySizes[i] = (int) (17*Math.pow(2, i+3));
             entryNums[i] = (int) (StorageSize.DEFAULT_UNIT_SIZE/entrySizes[i]);
         }
@@ -76,9 +76,9 @@ public class PMemThreadSpace2 implements Space2{
                 lock.lock();
                 unit = pool.allocate();
                 if (unit != null) {
-                    key = keys[slot].getAndIncrement();
+                    key = keys[slot].incrementAndGet();
                     while (slots[slot].putIfAbsent(key, unit) != null) {
-                        key = keys[slot].getAndIncrement();
+                        key = keys[slot].incrementAndGet();
                     }
                     unit.reset(entryNums[slot], entrySizes[slot]);
                     node = unit.write(data);

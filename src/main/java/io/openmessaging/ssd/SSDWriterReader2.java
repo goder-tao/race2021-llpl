@@ -57,6 +57,35 @@ public class SSDWriterReader2 implements DiskReader {
     }
 
     /**
+     * 并发读写可能存在.index已经落盘但是.data还在写中，实时获取.data的长度将导致读取的数据不完整，
+     * 默认人为能够从.index读取到的.data的数据信息表示数据已经落盘成功，但是热队列由于并发读写可能
+     * 达不到这个隐性的要求，添加一个延时等待.data的完全写入*/
+    public ByteBuffer readData(String path, long offset, int size) {
+        ByteBuffer data = null;
+        try {
+            RandomAccessFile file = new RandomAccessFile(path, "r");
+            long fl = file.length();
+            // 等待.data写完
+            while (fl < offset+size) {
+                logger.info("waiting for data file writing, file length: "+fl+", expected length: "+offset+size);
+                Thread.sleep(2);
+                fl = file.length();
+            }
+
+            byte[] b = new byte[size];
+            file.seek(offset);
+            file.read(b);
+            data = ByteBuffer.allocate(size);
+            data.put(b);
+            data.rewind();
+        } catch (Exception e) {
+            logger.error("Read from disk fail, " + e.toString());
+            return data;
+        }
+        return data;
+    }
+
+    /**
      * 将打开的OutputStream对象保存下来，减少因为频繁打开关闭文件流带来的开销*/
     public int append(String mntPath, String topic, int qID, String fileName, byte[] data) {
         try {
@@ -109,7 +138,10 @@ public class SSDWriterReader2 implements DiskReader {
             SSDReadBlockSize += size[i];
         }
         // 从ssd读数据
-        ByteBuffer SSDData = read(MntPath.SSD_PATH + topic + "/" + queueId + "/" + partitionPath + ".data", SSDDataStartOffset, SSDReadBlockSize);
+        ByteBuffer SSDData = readData(MntPath.SSD_PATH + topic + "/" + queueId + "/" + partitionPath + ".data", SSDDataStartOffset, SSDReadBlockSize);
+        if (SSDData.capacity() != SSDReadBlockSize) {
+            logger.fatal("Read data size not equal, expected size: "+SSDReadBlockSize+", got: "+SSDData.capacity());
+        }
         for (int i = 0; i < size.length; i++) {
             byte[] bytes = new byte[size[i]];
             SSDData.get(bytes);
@@ -121,5 +153,6 @@ public class SSDWriterReader2 implements DiskReader {
     public static SSDWriterReader2 getInstance() {
         return instance;
     }
+
 
 }

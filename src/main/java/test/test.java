@@ -5,10 +5,7 @@ import io.openmessaging.constant.StorageSize;
 import io.openmessaging.dramcache.DRAMCache;
 import io.openmessaging.ssd.SSDWriterReader;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.RandomAccessFile;
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
@@ -20,9 +17,77 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class test {
     public static void main(String[] args) throws IOException {
-        atomicTest();
+        final String path = MntPath.SSD_PATH+"test";
+        RandomAccessFile rfile = null;
+        BufferedOutputStream outputStream = null;
+        try {
+            outputStream = new BufferedOutputStream(new FileOutputStream(path));
+            rfile = new RandomAccessFile(path, "r");
+            for (int i = 0; i < 100000; i++) {
+                byte[] b = new byte[10];
+                outputStream.write(b);
+                outputStream.flush();
+                if (rfile.length() != (i+1)*10) {
+                    System.out.println("in time file length not equal");
+                }
+                
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                outputStream.close();
+                rfile.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
     }
 
+
+    /**
+     * 测试flush不关闭流使用rfile实时获取文件长度*/
+    static void testInTimeFileLength() throws IOException {
+        final String path = MntPath.SSD_PATH+"test";
+        for (int i = 0; i < 10; i++) {
+            Thread thread = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    RandomAccessFile rfile;
+                    BufferedOutputStream outputStream = null;
+                    Random random = new Random();
+                    int r = random.nextInt(1000);
+                    try {
+                        outputStream = new BufferedOutputStream(new FileOutputStream(path+r));
+                        for (int i = 0; i < 1000000; i++) {
+                            byte[] b = new byte[10];
+                            outputStream.write(b);
+                            outputStream.flush();
+                            rfile = new RandomAccessFile(path+r, "r");
+                            if (rfile.length() != (i+1)*10) {
+                                System.out.println("in time file length not equal");
+                            }
+                            rfile.close();
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    } finally {
+                        try {
+                            outputStream.close();
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+            });
+            thread.start();
+        }
+
+    }
+
+    /**
+     * 使用CAS保证并发的正确性测试*/
     static void atomicTest() {
         AtomicBoolean atomicBoolean = new AtomicBoolean(false);
         final int[]  i = new int[1];
