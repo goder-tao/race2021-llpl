@@ -66,12 +66,11 @@ public class SSDWriterReader2 implements DiskReader {
             RandomAccessFile file = new RandomAccessFile(path, "r");
             long fl = file.length();
             // 等待.data写完
-            while (fl < offset+size) {
+            if (fl < offset+size) {
                 logger.info("waiting for data file writing, file length: "+fl+", expected offset: "+offset+", expected size: "+size);
                 Thread.sleep(50);
-                fl = file.length();
             }
-
+            size = offset + size > fl ? (int) (fl - offset) : size;
             byte[] b = new byte[size];
             file.seek(offset);
             file.read(b);
@@ -140,7 +139,7 @@ public class SSDWriterReader2 implements DiskReader {
         // 从ssd读数据
         ByteBuffer SSDData = readData(MntPath.SSD_PATH + topic + "/" + queueId + "/" + partitionPath + ".data", SSDDataStartOffset, SSDReadBlockSize);
         if (SSDData.capacity() != SSDReadBlockSize) {
-            logger.fatal("Read data size not equal, expected size: "+SSDReadBlockSize+", got: "+SSDData.capacity());
+            logger.fatal("Read data size not equal, expected size: "+SSDReadBlockSize+", got: "+SSDData.capacity()+". offset: "+offset+", fetch: "+fetchNum+", index data capacity: "+indexData.capacity());
         }
         for (int i = 0; i < size.length; i++) {
             byte[] bytes = new byte[size[i]];
