@@ -1,5 +1,6 @@
 package io.openmessaging.scheduler;
 
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -14,7 +15,7 @@ public class PriorityListNode {
     // 下一个不在aep中的offset
     public AtomicLong tailOffset;
     long availableTime;
-    public volatile byte isVerified = 0;
+    public AtomicBoolean isVerified = new AtomicBoolean(false);
     final String topic;
     final int queueId;
     final String tName;

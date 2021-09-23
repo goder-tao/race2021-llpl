@@ -79,19 +79,4 @@ public class PMemSpace2 implements Space2 {
         return size;
     }
 
-    public static void main(String[] args) {
-        PMemSpace2 space = new PMemSpace2(MntPath.AEP_PATH+"test", StorageSize.MB*100);
-        Thread thread = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                String tName = Thread.currentThread().getName().split("-")[1];
-                for (int i = 0; i < 100; i++) {
-                    byte[] b = new byte[4];
-                    space.write(b, tName);
-                }
-            }
-        });
-        thread.start();
-
-    }
 }
