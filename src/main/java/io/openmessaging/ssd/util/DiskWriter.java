@@ -1,4 +1,4 @@
-package io.openmessaging.ssd;
+package io.openmessaging.ssd.util;
 
 import java.nio.ByteBuffer;
 

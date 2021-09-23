@@ -5,7 +5,7 @@ import io.openmessaging.constant.MntPath;
 import io.openmessaging.constant.StorageSize;
 import io.openmessaging.dramcache.DRAMCache;
 import io.openmessaging.manager.Manager;
-import io.openmessaging.ssd.SSDWriterReader2;
+import io.openmessaging.ssd.util.SSDWriterReader2;
 import io.openmessaging.util.SystemMemory;
 
 import java.nio.ByteBuffer;
@@ -36,27 +36,14 @@ public class testManager {
         thread1.start();
 
         try {
-            Thread.sleep(50);
-//            thread1.join();
-//            thread.join();
+            thread1.join();
+            thread.join();
         } catch (Exception e) {
             System.out.println(e.toString());
         }
-//        directReadDisk("test1", 1, 0, 50);
+
         testParallelRead(manager, "test", 0, 0, 40, "test1", 1, 0, 150);
         System.out.println();
-    }
-
-    // 直接读磁盘
-    static void directReadDisk(String topic, int qid, int s, int e) {
-        Map<Long, byte[]> map = SSDWriterReader2.getInstance().directRead(topic, qid, s, e-s);
-        for (long key:map.keySet()) {
-            byte[] b = map.get(key);
-            ByteBuffer buffer = ByteBuffer.allocate(b.length);
-            buffer.put(b);
-            buffer.rewind();
-            System.out.println(key+":"+buffer.getInt());
-        }
     }
 
     /**
@@ -120,7 +107,7 @@ public class testManager {
      */
     static void testSequentWrite(Manager manager, String topic, int qid, int s, int e) {
         for (int i = s; i < e; i++) {
-            ByteBuffer data = ByteBuffer.allocate(4);
+            ByteBuffer data = ByteBuffer.allocate(4096);
             data.putInt(i);
             manager.append(topic, qid, data);
         }

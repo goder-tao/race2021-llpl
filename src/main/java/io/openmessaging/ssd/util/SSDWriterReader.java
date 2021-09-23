@@ -1,4 +1,4 @@
-package io.openmessaging.ssd;
+package io.openmessaging.ssd.util;
 
 import io.openmessaging.constant.DataFileBasicInfo;
 import io.openmessaging.constant.MntPath;

@@ -2,49 +2,44 @@ package test;
 
 import io.openmessaging.constant.MntPath;
 import io.openmessaging.constant.StorageSize;
-import io.openmessaging.dramcache.DRAMCache;
-import io.openmessaging.ssd.SSDWriterReader;
+import io.openmessaging.ssd.util.IndexHandle;
+import io.openmessaging.ssd.util.SSDWriterReader;
 
 import java.io.*;
 import java.nio.ByteBuffer;
-import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.Arrays;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 
 public class test {
     public static void main(String[] args) throws IOException {
-        final String path = MntPath.SSD_PATH+"test";
-        RandomAccessFile rfile = null;
-        BufferedOutputStream outputStream = null;
-        try {
-            outputStream = new BufferedOutputStream(new FileOutputStream(path));
-            rfile = new RandomAccessFile(path, "r");
-            for (int i = 0; i < 100000; i++) {
-                byte[] b = new byte[10];
-                outputStream.write(b);
-                outputStream.flush();
-                if (rfile.length() != (i+1)*10) {
-                    System.out.println("in time file length not equal");
-                }
-                
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            try {
-                outputStream.close();
-                rfile.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+        File dir = new File("/home/tao/Data/sim_SSD");
+        String[] filename = dir.list();
+        Arrays.sort(filename);
+        for (String fn:filename) {
+            System.out.println(fn);
         }
-
     }
 
+    /**
+     * 读超过RandomAccessFile范围测试*/
+    static void outOfRandomAccessFileRangeRead() {
+        try {
+            RandomAccessFile file = new RandomAccessFile(MntPath.SSD_PATH+"test", "r");
+            byte[] b = new byte[10];
+            file.read(b);
+            ByteBuffer buffer = ByteBuffer.allocate(b.length);
+            buffer.put(b);
+            buffer.rewind();
+            System.out.println(buffer.getLong());
+            System.out.println(buffer.getShort());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 
     /**
      * 测试flush不关闭流使用rfile实时获取文件长度*/
@@ -78,6 +73,39 @@ public class test {
                         } catch (IOException e) {
                             e.printStackTrace();
                         }
+                    }
+                }
+            });
+            thread.start();
+        }
+
+    }
+
+    /**
+     * 测试flush不关闭流使用rfile实时获取文件长度*/
+    static void testForceWithoutClose() throws IOException {
+        final String path = MntPath.SSD_PATH+"test";
+        for (int i = 0; i < 1; i++) {
+            Thread thread = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    int writeTime = 1000;
+                    RandomAccessFile rfile = null;
+                    BufferedOutputStream outputStream = null;
+                    Random random = new Random();
+                    int r = random.nextInt(1000);
+                    try {
+                        rfile = new RandomAccessFile(path+r, "rw");
+                        FileChannel channel = rfile.getChannel();
+                        long t = System.nanoTime();
+                        for (int i = 0; i < writeTime; i++) {
+                            byte[] b = new byte[1024*2];
+                            rfile.seek(random.nextInt(1000));
+                            rfile.read(b);
+                        }
+                        System.out.println("average write time: "+(System.nanoTime()-t)/writeTime+"ns");
+                    } catch (Exception e) {
+                        e.printStackTrace();
                     }
                 }
             });
