@@ -8,20 +8,45 @@ import io.openmessaging.ssd.util.SSDWriterReader;
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.sql.Wrapper;
 import java.util.Arrays;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 
+class Node {
+    int i;
+    String name;
+    Node(String name, int i) {
+        this.i = i;
+        this.name = name;
+    }
+}
+
+class NodeWrap {
+    Node node;
+    NodeWrap(Node node) {
+        this.node = node;
+    }
+}
+
 public class test {
     public static void main(String[] args) throws IOException {
-        File dir = new File("/home/tao/Data/sim_SSD");
-        String[] filename = dir.list();
-        Arrays.sort(filename);
-        for (String fn:filename) {
-            System.out.println(fn);
+        ConcurrentLinkedQueue<NodeWrap> queue = new ConcurrentLinkedQueue<>();
+        Node node = new Node("node1", 1);
+
+        NodeWrap wrap = new NodeWrap(node);
+        NodeWrap wrap1 = new NodeWrap(node);
+        queue.offer(wrap);
+        queue.offer(wrap1);
+
+        for (NodeWrap w: queue) {
+            w.node.i = 2;
+            break;
         }
+        System.out.println("wrap2, "+wrap1.node.name+":"+wrap1.node.i);
     }
 
     /**

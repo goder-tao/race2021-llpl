@@ -2,7 +2,6 @@ package io.openmessaging.scheduler;
 
 import io.openmessaging.aep.mmu.MemoryNode;
 import io.openmessaging.aep.space.PMemSpace2;
-import io.openmessaging.ssd.util.SSDWriterReader2;
 import io.openmessaging.ssd.util.SSDWriterReader3;
 import io.openmessaging.util.MapUtil;
 import org.apache.log4j.LogManager;
@@ -19,11 +18,14 @@ import java.util.concurrent.ConcurrentHashMap;
  * 在aep中保存数据远小于aep给所有队列分配的平均空间值的queue先调度，并且更新一个较小的
  * 不可调度时间，而aep中已经存储了接近平均分配空间的队列分配较大的不可调度时间，减少调度的
  * 优先级。对于经常被消耗的queue，插入优先队列的头部，争取早检查是否满足调度条件
+ * @author tao
+ * @date 2021-09-08
  */
 public class Disk2AepScheduler {
+
     public final QueuePriorityList queuePriorityList = new QueuePriorityList();
     private final SSDWriterReader3 ssdWriterReader = SSDWriterReader3.getInstance();
-    ;
+
     private final PMemSpace2 pmemBlock;
     private boolean isWork = false;
     // 保存在aep中的handle
