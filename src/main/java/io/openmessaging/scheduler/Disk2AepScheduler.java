@@ -2,12 +2,14 @@ package io.openmessaging.scheduler;
 
 import io.openmessaging.aep.mmu.MemoryNode;
 import io.openmessaging.aep.space.PMemSpace2;
-import io.openmessaging.ssd.SSDWriterReader2;
+import io.openmessaging.ssd.util.SSDWriterReader2;
+import io.openmessaging.ssd.util.SSDWriterReader3;
 import io.openmessaging.util.MapUtil;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import sun.misc.Lock;
 
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -20,7 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class Disk2AepScheduler {
     public final QueuePriorityList queuePriorityList = new QueuePriorityList();
-    private final SSDWriterReader2 ssdWriterReader = SSDWriterReader2.getInstance();
+    private final SSDWriterReader3 ssdWriterReader = SSDWriterReader3.getInstance();
     ;
     private final PMemSpace2 pmemBlock;
     private boolean isWork = false;
@@ -93,21 +95,27 @@ public class Disk2AepScheduler {
         public void run() {
             // 数据调度
             long tailOffset = move.tailOffset.get();
-            Map<Long, byte[]> offsetDataMap = ssdWriterReader.directRead(move.topic, move.queueId, tailOffset, fetchNum);
+
             Map<Integer, Map<Long, MemoryNode>> queueOffsetHandle = MapUtil.getOrPutDefault(topicQueueOffsetHandle, move.topic, new HashMap<>());
             Map<Long, MemoryNode> offsetHandle = MapUtil.getOrPutDefault(queueOffsetHandle, move.queueId, new HashMap<>());
-            // 尝试调度入aep
-            for (long offset : offsetDataMap.keySet()) {
-                byte[] b = offsetDataMap.get(offset);
+
+            // 尝试调度预热fetchNum条消息
+            int i;
+            for (i = 0; i < fetchNum; i++) {
+                ByteBuffer bb = ssdWriterReader.directRead((move.topic+move.queueId+(tailOffset+i)).hashCode());
+                if (bb == null) break;
+                byte[] b = bb.array();
                 MemoryNode handle = pmemBlock.write(b, move.tName);
                 if (handle != null) {  // 分配空间成功，保存
-                    offsetHandle.put(offset, handle);
+                    offsetHandle.put(tailOffset+i, handle);
                 } else {  // 分配空间失败，空间不足，修改tailOffset,退出
-                    move.tailOffset.set(offset);
                     break;
                 }
             }
-            if (offsetDataMap.size() > 0) {
+
+            move.tailOffset.set(tailOffset+i);
+
+            if (i > 0) {
                 if (move.queueDataSize.get() < pmemBlock.getSize() / queuePriorityList.node_n * 0.8) {
                     // 稀疏队列，下次可调度的时间较短
                     move.availableTime = System.currentTimeMillis() + 1000;

@@ -19,7 +19,7 @@ public class DRAMCache {
     // 定时监视内存情况
     private Thread updateAvailableMemory;
     // key为topic+qid组合
-    private final ConcurrentHashMap<String, Map<Long, ByteBuffer>> cacheMap = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<String, Map<Long, ByteBuffer>> cacheMap = new ConcurrentHashMap<>();
     // 限定一个内存的下限值，应对未知的情况
     private final long memoryDownThreshold = StorageSize.MB * 500;
     // 当前内存
@@ -35,8 +35,7 @@ public class DRAMCache {
     }
 
     public void startDetect() {
-        if (!startDetect.get()) {
-            startDetect.set(true);
+        if (startDetect.compareAndSet(false, true)) {
             updateAvailableMemory = new Thread(new Runnable() {
                 @Override
                 public void run() {
