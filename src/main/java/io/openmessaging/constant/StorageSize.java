@@ -8,10 +8,10 @@ public class StorageSize {
     public static final long MB = 1024 * KB;
     public static final long GB = 1024 * MB;
 
-//    public static final long COLD_SPACE_SIZE = 45*GB;
-//    public static final long HOT_SPACE_SIZE = 15*GB;
-    public static final long COLD_SPACE_SIZE = 400*MB;
-    public static final long HOT_SPACE_SIZE = 200*MB;
+    public static final long COLD_SPACE_SIZE = 45*GB;
+    public static final long HOT_SPACE_SIZE = 15*GB;
+//    public static final long COLD_SPACE_SIZE = 400*MB;
+//    public static final long HOT_SPACE_SIZE = 200*MB;
     public static final long DEFAULT_UNIT_SIZE = 50*MB;
 
     // 批大小
