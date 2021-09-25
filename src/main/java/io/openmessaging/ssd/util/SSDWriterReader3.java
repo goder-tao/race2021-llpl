@@ -32,7 +32,6 @@ public class SSDWriterReader3 {
     private final Logger logger = LogManager.getLogger(SSDWriterReader3.class.getName());
 
     private SSDWriterReader3() {
-
         File dir = new File(dataFileDir);
         if (!dir.exists()) {
             dir.mkdirs();

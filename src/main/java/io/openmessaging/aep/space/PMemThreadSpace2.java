@@ -8,6 +8,7 @@ import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import sun.misc.Lock;
 
+import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -15,20 +16,20 @@ public class PMemThreadSpace2 implements Space2{
     PMemUnitPool pool;
     // 每个线程pmem空间的槽
     // 每个槽表示的单项大小分别为136, 272, 544, 1088, 2176, 4352, 8704, 17408
-    private ConcurrentHashMap<Integer, PMemUnit>[] slots = new ConcurrentHashMap[8];
+    private HashMap<Integer, PMemUnit>[] slots = new HashMap[8];
     // 生成每个槽map的key, 表示上次分配的Unit的key
-    private AtomicInteger[] keys = new AtomicInteger[8];
+    private Integer[] keys = new Integer[8];
     private int[] entrySizes = new int[8];
     private int[] entryNums = new int[8];
     // 保证内存池分配的原子性锁
-    private final Lock lock = new Lock();
     private final Logger logger = LogManager.getLogger(PMemThreadSpace2.class.getName());
 
     public PMemThreadSpace2(PMemUnitPool pool) {
         this.pool = pool;
         for (int i = 0; i < 8; i++) {
-            slots[i] = new ConcurrentHashMap<Integer, PMemUnit>();
-            keys[i] = new AtomicInteger(-1);
+            slots[i] = new HashMap<Integer, PMemUnit>();
+            // 初始值-1是因为保证后面开始分配的时候key能从0开始
+            keys[i] = -1;
             entrySizes[i] = (int) (17*Math.pow(2, i+3));
             entryNums[i] = (int) (StorageSize.DEFAULT_UNIT_SIZE/entrySizes[i]);
         }
@@ -64,7 +65,7 @@ public class PMemThreadSpace2 implements Space2{
             }
         }
         // 尝试向上一个分配的Unit写入
-        int key = keys[slot].get();
+        int key = keys[slot];
         unit = slots[slot].getOrDefault(key, null);
         if (unit != null) {
             node = unit.write(data);
@@ -72,22 +73,12 @@ public class PMemThreadSpace2 implements Space2{
 
         // 上一个分配的unit写入失败，尝试向pool请求unit
         if (node == null) {
-            try {
-                lock.lock();
-                unit = pool.allocate();
-                if (unit != null) {
-                    key = keys[slot].incrementAndGet();
-                    while (slots[slot].putIfAbsent(key, unit) != null) {
-                        key = keys[slot].incrementAndGet();
-                    }
-                    unit.reset(entryNums[slot], entrySizes[slot]);
-                    node = unit.write(data);
-                }
-                lock.unlock();
-            } catch (Exception e) {
-                logger.error("ThreadSpace lock error: "+e.toString());
-            } finally {
-                lock.unlock();
+            unit = pool.allocate();
+            if (unit != null) {
+                key = ++keys[slot];
+                slots[slot].putIfAbsent(key, unit);
+                unit.reset(entryNums[slot], entrySizes[slot]);
+                node = unit.write(data);
             }
         }
 

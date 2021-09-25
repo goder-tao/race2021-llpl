@@ -5,45 +5,76 @@ import io.openmessaging.constant.MntPath;
 import io.openmessaging.constant.StorageSize;
 import io.openmessaging.dramcache.DRAMCache;
 import io.openmessaging.manager.Manager;
-import io.openmessaging.ssd.util.SSDWriterReader2;
 import io.openmessaging.util.SystemMemory;
 
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class testManager {
     public static void main(String[] args) {
-        testParallel();
+        testScheduler();
+    }
+
+    /**
+     * 调度器测试，先写一些数据，写满，再从offset 0开始读所有的数据，
+     * 正常情况下返回值会大于coldSpace中所能保存的最大消息数
+     *      strategy: 40MB的pmem空间， 写入数据一次4kb, 写入50MB(12800次)*/
+    static void testScheduler() {
+        Manager manager = new Manager();
+        Thread thread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                testSequentWrite(manager, "test", 0, 0, 12800);
+                testSequentRead(manager, "test", 0, 0, 12800);
+            }
+        });
+        thread.start();
+        try {
+            thread.join();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     /**
      * 并发写，并发读*/
     static void testParallel() {
         Manager manager = new Manager();
-        Thread thread = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                testSequentWrite(manager, "test", 0, 0, 40);
-            }
-        }), thread1 = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                testSequentWrite(manager, "test1", 1, 0, 50);
-            }
-        });
-        thread.start();
-        thread1.start();
+
+        ExecutorService executorService = Executors.newFixedThreadPool(10);
+
+        for (int i = 0; i < 15; i++) {
+            executorService.submit(new WriterRunner(manager, i));
+        }
 
         try {
-            thread1.join();
-            thread.join();
+            Thread.sleep(5000);
+//            thread1.join();
+//            thread.join();
         } catch (Exception e) {
             System.out.println(e.toString());
         }
 
-        testParallelRead(manager, "test", 0, 0, 40, "test1", 1, 0, 150);
+        testParallelRead(manager, "test0", 0, 0, 40, "test1", 0, 0, 150);
         System.out.println();
+    }
+
+    /**
+     * 专门顺序写的线程*/
+    static class WriterRunner implements Runnable {
+        int i;
+        Manager manager;
+        public WriterRunner(Manager manager, int i) {
+            this.i = i;
+            this.manager = manager;
+        }
+        @Override
+        public void run() {
+            testSequentWrite(manager, "test"+i, 0, 0, 50);
+        }
     }
 
     /**

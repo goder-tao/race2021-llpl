@@ -16,11 +16,11 @@ public class PMemUnit implements Space2 {
     private MemoryBlock block;
     // Unit的entry数量和当前数量
     private int entryNum;
-    AtomicInteger currentEntry = new AtomicInteger();
+    int currentEntry = 0;
     // entry大小
     private short entrySize;
     // 使用标识
-    private AtomicBoolean[] arrayFlag;
+    private Boolean[] arrayFlag;
     // 从上次空的位置开始找位置
     private int lastPosition = 0;
 
@@ -38,23 +38,23 @@ public class PMemUnit implements Space2 {
     public void reset(int entryNum, int entrySize) {
         this.entryNum = entryNum;
         this.entrySize = (short) entrySize;
-        currentEntry.set(0);
-        arrayFlag = new AtomicBoolean[entryNum];
+        currentEntry = 0;
+        arrayFlag = new Boolean[entryNum];
         for (int i = 0; i < entryNum; i++) {
-            arrayFlag[i] = new AtomicBoolean(false);
+            arrayFlag[i] = Boolean.FALSE;
         }
     }
 
     @Override
     public void free(MemoryNode listNode) {
-        arrayFlag[listNode.entryPosition].set(false);
-        currentEntry.decrementAndGet();
+        arrayFlag[listNode.entryPosition] = Boolean.FALSE;
+        currentEntry--;
     }
 
     @Override
     public MemoryNode write(byte[] data) {
         // 已满
-        if (currentEntry.get() == entryNum) {
+        if (currentEntry == entryNum) {
             return null;
         }
         MemoryNode node = null;
@@ -63,18 +63,23 @@ public class PMemUnit implements Space2 {
         int last = mark;
         // 开始遍历找空的entry
         do {
-            if (arrayFlag[last%entryNum].compareAndSet(false, true)) {
+            if (arrayFlag[last%entryNum] == Boolean.FALSE) {
+                arrayFlag[last%entryNum] = Boolean.TRUE;
                 node = new MemoryNode();
                 node.entryPosition = last%entryNum;
                 node.dataSize = (short) data.length;
                 PMemReaderWriter2.getInstance().write(block, node.entryPosition*entrySize, data);
-                currentEntry.incrementAndGet();
+                currentEntry++;
                 break;
             }
             last++;
         } while (last%entryNum != mark);
 
-        lastPosition = last+1;
+        // 找不到
+        if (last%entryNum != mark) {
+            lastPosition = last+1;
+        }
+
         return node;
     }
 
@@ -84,7 +89,7 @@ public class PMemUnit implements Space2 {
     }
 
     public int getCurrentEntryNum() {
-        return currentEntry.get();
+        return currentEntry;
     }
 
 }

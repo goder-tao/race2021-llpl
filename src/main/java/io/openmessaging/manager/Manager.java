@@ -39,6 +39,8 @@ public class Manager {
     private final ConcurrentHashMap<String, Map<Integer, Map<Long, MemoryNode>>> coldTopicQueueOffsetHandle = new ConcurrentHashMap<>();
     // hot space handle
     private final ConcurrentHashMap<String, Map<Integer, Map<Long, MemoryNode>>> hotTopicQueueOffsetHandle = new ConcurrentHashMap<>();
+    // 记录topic的线程名字
+    private final ConcurrentHashMap<String, String> topicThreadName = new ConcurrentHashMap<>();
     // scheduler
     private final Disk2AepScheduler2 scheduler;
     // memory cache
@@ -79,7 +81,7 @@ public class Manager {
 
         long appendOffset;
         String tName = Thread.currentThread().getName().split("-")[1];
-
+        topicThreadName.putIfAbsent(topic, tName);
         // append offset
         Map<Integer, Long> queueOffset;
         queueOffset = MapUtil.getOrPutDefault(topicQueueOffset, topic, new HashMap<>());
@@ -161,8 +163,6 @@ public class Manager {
             }
         }
 
-
-
         try {
             boolean status = asyncWriteDisk.get();
         } catch (Exception e) {
@@ -186,7 +186,6 @@ public class Manager {
                     (double) sumMapTime.get() / sumAppendTime.get(), (double) sumPMemIO.get() / sumAppendTime.get(),
                     (double) sumDiskIO.get() / sumAppendTime.get());
         }
-
         return appendOffset;
     }
 
@@ -219,7 +218,7 @@ public class Manager {
             if (node.isVerified.compareAndSet(false, true)) {  // 未验证
                 if (offset == 0) {  // 冷队列
                     dataMap = readColdQueueData(topic, queueId, offset, fetchNum, node);
-                    scheduler.putSchedulerTask(topic, queueId, Thread.currentThread().getName().split("-")[1], fetchNum, node);
+                    scheduler.putSchedulerTask(topic, queueId, topicThreadName.get(topic), fetchNum, node);
                 } else {  // 热队列，清除aep冷空间和当前queue的数据
                     // 清除优先队列中的节点
                     coldQueueMap.remove(queueId);

@@ -7,6 +7,7 @@ import io.openmessaging.ssd.util.SSDWriterReader;
 
 import java.io.*;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
 import java.sql.Wrapper;
 import java.util.Arrays;
@@ -34,19 +35,23 @@ class NodeWrap {
 
 public class test {
     public static void main(String[] args) throws IOException {
-        ConcurrentLinkedQueue<NodeWrap> queue = new ConcurrentLinkedQueue<>();
-        Node node = new Node("node1", 1);
+        writeTest();
+    }
 
-        NodeWrap wrap = new NodeWrap(node);
-        NodeWrap wrap1 = new NodeWrap(node);
-        queue.offer(wrap);
-        queue.offer(wrap1);
-
-        for (NodeWrap w: queue) {
-            w.node.i = 2;
-            break;
+    static void writeTest() {
+        try {
+            RandomAccessFile raf = new RandomAccessFile(MntPath.SSD_PATH+"test", "rw");
+            FileChannel channel = raf.getChannel();
+            Random random = new Random();
+            long t = System.nanoTime();
+            for (int i = 0; i < 1280; i++) {
+                channel.write(ByteBuffer.wrap(new byte[4000+random.nextInt(100)]));
+                channel.force(true);
+            }
+            System.out.println("spend time of writing 50MB: "+(System.nanoTime()-t));
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-        System.out.println("wrap2, "+wrap1.node.name+":"+wrap1.node.i);
     }
 
     /**

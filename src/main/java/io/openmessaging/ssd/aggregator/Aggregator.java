@@ -35,12 +35,13 @@ public class Aggregator implements Runnable {
      * 并且通知刷盘程序刷盘*/
     public synchronized void putMessageRequest(MessagePutRequest req) {
         // 当前batch已经满了，需要进行刷盘
-        synchronized (this.batch) {
-            if (!this.batch.tryToAdd(req)) {
-                flushBatchQueue.offer(batch);
-                batch = new Batch();
-                batch.tryToAdd(req);
-            }
+        if (!this.batch.tryToAdd(req)) {
+            flushBatchQueue.offer(batch);
+            batch = new Batch();
+            batch.tryToAdd(req);
+        } else if (batch.isCanFlush()) {
+            flushBatchQueue.offer(batch);
+            batch = new Batch();
         }
     }
 
@@ -56,23 +57,21 @@ public class Aggregator implements Runnable {
         while (true) {
             head = flushBatchQueue.peek();
             if (head != null) {
-//                System.out.println("11111");
-                if (head.isCanFlush()) {
-                    doFlush();
-                } else {
-                    int batchSize = head.getBatchSize();
-                    try {
-                        Thread.sleep(1);
-                    } catch (Exception e) {
-                        logger.error(""+e.toString());
-                    }
-                    // batch的大小没有变化, 已经不再能聚合线程，flush掉当前batch
-                    if (batchSize == head.getBatchSize()) {
-                        doFlush();
-                    }
+                doFlush();
+            } else { //队列为空，但是batch不空，一种是没有再多的队列让这个batch再增大， 另一种是还在增长
+                int batchSize = batch.getBatchSize();
+                try {
+                    Thread.sleep(1);
+                } catch (Exception e) {
+                    logger.error(""+e.toString());
+                }
+                // batch的大小没有变化, 已经不再能聚合线程，加入queue准备force
+                if (batchSize == batch.getBatchSize()) {
+                    flushBatchQueue.offer(batch);
+                    // 新建另一个batch接收新的req
+                    batch = new Batch();
                 }
             }
-
         }
     }
 
@@ -81,34 +80,32 @@ public class Aggregator implements Runnable {
      * index更新，最终调用indexfile的mmap进行刷盘，接着通知所有request
      * 刷盘已经完成，异步任务完成*/
     private void doFlush() {
+        long t = System.nanoTime();
+
         Batch flushBatch = flushBatchQueue.poll();
-        if (flushBatchQueue.isEmpty()) {
-            batch = new Batch();
-            flushBatchQueue.offer(batch);
-        }
         if (flushBatch.isEmpty())  return;
         int off = 0, size;
-        if (flushBatch != null) {
-            // 遍历batch中的每一个request
-            ByteBuffer buffer = ByteBuffer.allocate(flushBatch.getBatchSize());
-            for (MessagePutRequest msg : flushBatch) {
-                size = msg.getMessage().getData().length;
-                // put data
-                buffer.put(msg.getMessage().getData(), 0, size);
-                off += size;
-            }
 
-            // 刷盘 ->
-            long sOff = SSDWriterReader3.getInstance().append(buffer.array());
-            // 更新index
-            for (MessagePutRequest msg : flushBatch) {
-                indexHandle.newIndex(msg.getMessage().getHashKey(), sOff, (short) msg.getMessage().getData().length);
-                sOff += msg.getMessage().getData().length;
-                msg.countDown();
-            }
-            // force index
-            indexHandle.force();
+        // 遍历batch中的每一个request
+        ByteBuffer buffer = ByteBuffer.allocate(flushBatch.getBatchSize());
+        for (MessagePutRequest msg : flushBatch) {
+            size = msg.getMessage().getData().length;
+            // put data
+            buffer.put(msg.getMessage().getData(), 0, size);
+            off += size;
         }
+
+        // 刷盘 ->
+        long sOff = SSDWriterReader3.getInstance().append(buffer.array());
+        // 更新index
+        for (MessagePutRequest msg : flushBatch) {
+            indexHandle.newIndex(msg.getMessage().getHashKey(), sOff, (short) msg.getMessage().getData().length);
+            sOff += msg.getMessage().getData().length;
+            msg.countDown();
+        }
+        // force index
+        indexHandle.force();
+        System.out.println("flush time: "+(System.nanoTime()-t));
     }
 
     /**
@@ -131,6 +128,5 @@ public class Aggregator implements Runnable {
                 waitPoint = new CountDownLatch(1);
             }
         }
-
     }
 }
