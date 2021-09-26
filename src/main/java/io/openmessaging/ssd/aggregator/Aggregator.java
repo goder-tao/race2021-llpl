@@ -111,7 +111,7 @@ public class Aggregator implements Runnable {
         for (MessagePutRequest msg:flushBatch) {
             msg.countDown();
         }
-//        System.out.println("flush time: "+(System.nanoTime()-t));
+        System.out.println("flush time: "+(System.nanoTime()-t));
     }
 
     /**
