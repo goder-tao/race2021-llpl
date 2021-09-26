@@ -40,13 +40,14 @@ public class test {
 
     static void writeTest() {
         try {
-            RandomAccessFile raf = new RandomAccessFile(MntPath.SSD_PATH+"test", "rw");
+            RandomAccessFile raf = new RandomAccessFile(MntPath.SSD_PATH+"test", "rws");
             FileChannel channel = raf.getChannel();
             Random random = new Random();
             long t = System.nanoTime();
             for (int i = 0; i < 1280; i++) {
-                channel.write(ByteBuffer.wrap(new byte[4000+random.nextInt(100)]));
-                channel.force(true);
+//                channel.write(ByteBuffer.wrap(new byte[4000+random.nextInt(100)]));
+//                channel.force(true);
+                raf.write(new byte[4000+random.nextInt(100)]);
             }
             System.out.println("spend time of writing 50MB: "+(System.nanoTime()-t));
         } catch (Exception e) {

@@ -3,6 +3,7 @@ package io.openmessaging.scheduler;
 import io.openmessaging.aep.mmu.MemoryNode;
 import io.openmessaging.aep.space.PMemSpace2;
 import io.openmessaging.ssd.util.SSDWriterReader3;
+import io.openmessaging.ssd.util.SSDWriterReader4;
 import io.openmessaging.util.MapUtil;
 
 import java.nio.ByteBuffer;
@@ -94,7 +95,7 @@ public class Disk2AepScheduler2 implements Runnable {
             // 尝试调度预热fetchNum条消息
             int i;
             for (i = 0; i < task.fetchNum; i++) {
-                ByteBuffer bb = SSDWriterReader3.getInstance().directRead((task.topic+task.queueId+(tailOffset+i)).hashCode());
+                ByteBuffer bb = SSDWriterReader4.getInstance().directRead((task.topic+task.queueId+(tailOffset+i)).hashCode());
                 if (bb == null) break;
                 byte[] b = bb.array();
                 MemoryNode handle = coldSpace.write(b, task.tName);

@@ -5,14 +5,13 @@ import io.openmessaging.aep.space.PMemSpace2;
 import io.openmessaging.constant.MntPath;
 import io.openmessaging.constant.StorageSize;
 import io.openmessaging.dramcache.DRAMCache;
-import io.openmessaging.scheduler.Disk2AepScheduler;
 import io.openmessaging.scheduler.Disk2AepScheduler2;
 import io.openmessaging.scheduler.PriorityNode;
 import io.openmessaging.ssd.aggregator.Aggregator;
 import io.openmessaging.ssd.aggregator.Message4Flush;
 import io.openmessaging.ssd.aggregator.MessagePutRequest;
 import io.openmessaging.ssd.util.IndexHandle;
-import io.openmessaging.ssd.util.SSDWriterReader3;
+import io.openmessaging.ssd.util.SSDWriterReader4;
 import io.openmessaging.util.ByteBufferUtil;
 import io.openmessaging.util.MapUtil;
 import org.apache.log4j.LogManager;
@@ -30,7 +29,7 @@ public class Manager {
     // aep冷空间和热空间
     private final PMemSpace2 coolBlock;
     private final PMemSpace2 hotBlock;
-    private final SSDWriterReader3 ssdWriterReader = SSDWriterReader3.getInstance();
+    private final SSDWriterReader4 ssdWriterReader = SSDWriterReader4.getInstance();
     // 保存每个冷queue在aep冷空间的最后一个offset值以及当前冷队列使用了多少aep空间
     private final ConcurrentHashMap<String, Map<Integer, PriorityNode>> coldTopicQueuePriMap = new ConcurrentHashMap<>();
     // 获取到topic+qid下当前插入数据数的offset
@@ -51,7 +50,7 @@ public class Manager {
     private final IndexHandle indexHandle;
     // 线程池
     private final ExecutorService executorService = Executors.newFixedThreadPool(50);
-    private final ExecutorService cleanService = Executors.newFixedThreadPool(5);
+    private final ExecutorService cleanService = Executors.newFixedThreadPool(3);
     // 阶段标记
     private AtomicBoolean isStageChanged = new AtomicBoolean(false);
     private final Logger logger = LogManager.getLogger(Manager.class.getName());
@@ -171,21 +170,22 @@ public class Manager {
 
         write2DiskFlag = System.nanoTime();
 
-        if (pmemIOFlag != 0) {
-            long appendTime = write2DiskFlag - startFlag;
-            long mapTime = mapFlag - startFlag;
-            long pmemIOTime = pmemIOFlag - mapFlag;
-            long writeDiskTime = write2DiskFlag - pmemIOFlag;
-            sumAppendTime.addAndGet(appendTime);
-            sumMapTime.addAndGet(mapTime);
-            sumPMemIO.addAndGet(pmemIOTime);
-            sumDiskIO.addAndGet(writeDiskTime);
-            System.out.printf("Append spend time: %dns, map time: %dns, pmem io time: %dns, disk io time: %dns\n" +
-                            "Spend time - map time: %f%%, pmem io: %f%%, hdd io: %f%%\n\n",
-                    appendTime, mapTime, pmemIOTime, writeDiskTime,
-                    (double) sumMapTime.get() / sumAppendTime.get(), (double) sumPMemIO.get() / sumAppendTime.get(),
-                    (double) sumDiskIO.get() / sumAppendTime.get());
-        }
+//        if (pmemIOFlag != 0) {
+//            long appendTime = write2DiskFlag - startFlag;
+//            long mapTime = mapFlag - startFlag;
+//            long pmemIOTime = pmemIOFlag - mapFlag;
+//            long writeDiskTime = write2DiskFlag - pmemIOFlag;
+//            sumAppendTime.addAndGet(appendTime);
+//            sumMapTime.addAndGet(mapTime);
+//            sumPMemIO.addAndGet(pmemIOTime);
+//            sumDiskIO.addAndGet(writeDiskTime);
+//            System.out.printf("Append spend time: %dns, map time: %dns, pmem io time: %dns, disk io time: %dns\n" +
+//                            "Spend time - map time: %f%%, pmem io: %f%%, hdd io: %f%%\n\n",
+//                    appendTime, mapTime, pmemIOTime, writeDiskTime,
+//                    (double) sumMapTime.get() / sumAppendTime.get(), (double) sumPMemIO.get() / sumAppendTime.get(),
+//                    (double) sumDiskIO.get() / sumAppendTime.get());
+//        }
+
         return appendOffset;
     }
 

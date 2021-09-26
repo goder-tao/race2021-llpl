@@ -15,7 +15,7 @@ import java.util.concurrent.Executors;
 
 public class testManager {
     public static void main(String[] args) {
-        testScheduler();
+        testParallel();
     }
 
     /**
@@ -46,17 +46,17 @@ public class testManager {
 
         ExecutorService executorService = Executors.newFixedThreadPool(10);
 
-        for (int i = 0; i < 15; i++) {
-            executorService.submit(new WriterRunner(manager, i));
-        }
-
-        try {
-            Thread.sleep(5000);
-//            thread1.join();
-//            thread.join();
-        } catch (Exception e) {
-            System.out.println(e.toString());
-        }
+//        for (int i = 0; i < 15; i++) {
+//            executorService.submit(new WriterRunner(manager, i));
+//        }
+//
+//        try {
+//            Thread.sleep(5000);
+////            thread1.join();
+////            thread.join();
+//        } catch (Exception e) {
+//            System.out.println(e.toString());
+//        }
 
         testParallelRead(manager, "test0", 0, 0, 40, "test1", 0, 0, 150);
         System.out.println();

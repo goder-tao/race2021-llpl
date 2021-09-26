@@ -3,6 +3,7 @@ package io.openmessaging.scheduler;
 import io.openmessaging.aep.mmu.MemoryNode;
 import io.openmessaging.aep.space.PMemSpace2;
 import io.openmessaging.ssd.util.SSDWriterReader3;
+import io.openmessaging.ssd.util.SSDWriterReader4;
 import io.openmessaging.util.MapUtil;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
@@ -24,7 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class Disk2AepScheduler {
 
     public final QueuePriorityList queuePriorityList = new QueuePriorityList();
-    private final SSDWriterReader3 ssdWriterReader = SSDWriterReader3.getInstance();
+    private final SSDWriterReader4 ssdWriterReader = SSDWriterReader4.getInstance();
 
     private final PMemSpace2 pmemBlock;
     private boolean isWork = false;

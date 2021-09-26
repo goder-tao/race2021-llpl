@@ -2,13 +2,12 @@ package io.openmessaging.ssd.aggregator;
 
 import io.openmessaging.ssd.util.SSDWriterReader3;
 import io.openmessaging.ssd.util.IndexHandle;
+import io.openmessaging.ssd.util.SSDWriterReader4;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
 import java.nio.ByteBuffer;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 /**
  * 向上聚合多个thread的数据，默认8kb聚合，向下调用底层
@@ -19,10 +18,13 @@ import java.util.concurrent.TimeUnit;
  * */
 public class Aggregator implements Runnable {
     private volatile Batch batch = new Batch();
+    // 等待落盘的batch队列
     private final ConcurrentLinkedQueue<Batch> flushBatchQueue = new ConcurrentLinkedQueue<>();
     private volatile CountDownLatch waitPoint = new CountDownLatch(1);
     private final IndexHandle indexHandle;
     private final Logger logger = LogManager.getLogger(Aggregator.class.getName());
+    // 并发不同点位点位写的线程池
+    private final ExecutorService writerPool = Executors.newFixedThreadPool(15);
 
     public Aggregator(IndexHandle indexHandle) {
         this.indexHandle = indexHandle;
@@ -57,7 +59,8 @@ public class Aggregator implements Runnable {
         while (true) {
             head = flushBatchQueue.peek();
             if (head != null) {
-                doFlush();
+                // 启动一个task去刷盘
+                writerPool.execute(this::doFlush);
             } else { //队列为空，但是batch不空，一种是没有再多的队列让这个batch再增大， 另一种是还在增长
                 int batchSize = batch.getBatchSize();
                 try {
@@ -83,7 +86,7 @@ public class Aggregator implements Runnable {
         long t = System.nanoTime();
 
         Batch flushBatch = flushBatchQueue.poll();
-        if (flushBatch.isEmpty())  return;
+        if (flushBatch == null || flushBatch.isEmpty())  return;
         int off = 0, size;
 
         // 遍历batch中的每一个request
@@ -96,16 +99,19 @@ public class Aggregator implements Runnable {
         }
 
         // 刷盘 ->
-        long sOff = SSDWriterReader3.getInstance().append(buffer.array());
+        long sOff = SSDWriterReader4.getInstance().write(buffer.array());
         // 更新index
         for (MessagePutRequest msg : flushBatch) {
             indexHandle.newIndex(msg.getMessage().getHashKey(), sOff, (short) msg.getMessage().getData().length);
             sOff += msg.getMessage().getData().length;
-            msg.countDown();
         }
         // force index
         indexHandle.force();
-        System.out.println("flush time: "+(System.nanoTime()-t));
+        // 通知写入线程落盘完成
+        for (MessagePutRequest msg:flushBatch) {
+            msg.countDown();
+        }
+//        System.out.println("flush time: "+(System.nanoTime()-t));
     }
 
     /**

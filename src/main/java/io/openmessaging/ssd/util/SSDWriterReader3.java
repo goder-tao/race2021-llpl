@@ -13,8 +13,11 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
+ * 单线程方式和Aggregator对接
  * @author tao
  * @date 2021-09-22*/
 public class SSDWriterReader3 {
@@ -25,7 +28,7 @@ public class SSDWriterReader3 {
     // 记录到当前datafile的总偏移量，read时的精确定位文件
     private ArrayList<Long> accumulativePhyOffset = new ArrayList<>();
     // 记录所有datafile的偏移量之和, 计算当前的写入点
-    private long finalPhyOffset = 0;
+    private AtomicLong finalPhyOffset = new AtomicLong(0);
     // datafile保存的根目录
     private final String dataFileDir = MntPath.DATA_FILE_DIR;
 
@@ -46,8 +49,8 @@ public class SSDWriterReader3 {
             if (fileNames != null) {
                 for (String filename: fileNames) {
                     RandomAccessFile file = new RandomAccessFile(dataFileDir+filename, "rw");
-                    finalPhyOffset += file.length();
-                    accumulativePhyOffset.add(finalPhyOffset);
+                    finalPhyOffset.addAndGet(file.length());
+                    accumulativePhyOffset.add(finalPhyOffset.get());
                     fileList.add(file);
                 }
             }
@@ -95,35 +98,37 @@ public class SSDWriterReader3 {
     }
 
     /**
+     * 单线程顺序写入
      * @return: 本次写入的起点*/
     public long append(byte[] data) {
         // 写入点
-        long writeStartOffset = finalPhyOffset;
+        long writeStartOffset = finalPhyOffset.getAndAdd(data.length);
         int listSize = fileList.size();
         FileChannel channel;
+        RandomAccessFile raf;
 
         try {
             // 超出默认的一个data partition的大小或首个partition，新建一个分区
             if (listSize == 0 || fileList.get(listSize-1).length()+data.length > StorageSize.GB) {
                 // 记录上一个datafile的累计phyOffset
                 if (listSize != 0 && fileList.get(listSize-1).length()+data.length > StorageSize.GB) {
-                    accumulativePhyOffset.add(finalPhyOffset);
+                    accumulativePhyOffset.add(finalPhyOffset.get());
                 }
                 String fileName = PartitionMaker.makePartitionPath(listSize, 5, 1)+".data";
-                RandomAccessFile raf = new RandomAccessFile(dataFileDir+"/"+fileName, "rw");
+                 raf = new RandomAccessFile(dataFileDir+"/"+fileName, "rws");
                 fileList.add(raf);
-                channel = raf.getChannel();
+//                channel = raf.getChannel();
             } else {
-                channel = fileList.get(listSize-1).getChannel();
+                raf = fileList.get(listSize-1);
+//                channel = fileList.get(listSize-1).getChannel();
             }
             // 持久化
-            channel.write(ByteBuffer.wrap(data));
-            channel.force(true);
+//            channel.write(ByteBuffer.wrap(data));
+//            channel.force(true);
+            raf.write(data);
         } catch (IOException e) {
             logger.error("try to get file length fail, "+e.toString());
         }
-
-        finalPhyOffset += data.length;
 
         return writeStartOffset;
     }

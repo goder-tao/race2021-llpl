@@ -27,8 +27,13 @@ public class Batch extends ConcurrentLinkedQueue<MessagePutRequest> {
     public boolean tryToAdd(MessagePutRequest req) {
         // 首个加入batch的req作为head，这个head决定这个batch的聚合上限
         if (this.isEmpty()) {
-            int l = (int) (req.getMessage().getData().length/(StorageSize.KB*4));
-            batchSizeLimit = (int) ((l+1)*StorageSize.KB*4);
+            if (req.getMessage().getData().length <= 8*StorageSize.KB) {
+                batchSizeLimit = (int) (8*StorageSize.KB);
+            } else if (req.getMessage().getData().length <= 16*StorageSize.KB) {
+                batchSizeLimit = (int) (16*StorageSize.KB);
+            } else {
+                batchSizeLimit = (int) (24*StorageSize.KB);
+            }
         }
         if (req.getMessage().getData().length+batchSize.get() <= batchSizeLimit) {
             super.add(req);
