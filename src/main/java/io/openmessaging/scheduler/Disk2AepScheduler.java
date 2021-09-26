@@ -25,7 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class Disk2AepScheduler {
 
     public final QueuePriorityList queuePriorityList = new QueuePriorityList();
-    private final SSDWriterReader4 ssdWriterReader = SSDWriterReader4.getInstance();
+    private final SSDWriterReader3 ssdWriterReader = SSDWriterReader3.getInstance();
 
     private final PMemSpace2 pmemBlock;
     private boolean isWork = false;

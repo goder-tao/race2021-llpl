@@ -95,7 +95,7 @@ public class Disk2AepScheduler2 implements Runnable {
             // 尝试调度预热fetchNum条消息
             int i;
             for (i = 0; i < task.fetchNum; i++) {
-                ByteBuffer bb = SSDWriterReader4.getInstance().directRead((task.topic+task.queueId+(tailOffset+i)).hashCode());
+                ByteBuffer bb = SSDWriterReader3.getInstance().directRead((task.topic+task.queueId+(tailOffset+i)).hashCode());
                 if (bb == null) break;
                 byte[] b = bb.array();
                 MemoryNode handle = coldSpace.write(b, task.tName);

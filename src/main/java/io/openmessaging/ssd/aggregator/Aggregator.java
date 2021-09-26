@@ -7,13 +7,14 @@ import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.concurrent.*;
 
 /**
  * 向上聚合多个thread的数据，默认8kb聚合，向下调用底层
- * disk写接口写入一批数据，更新一批index并且通知thread
- * 刷盘已完成
- * @data 2021-09-21
+ * disk写接口写入一批数据。默认5batch数据force一次
+ * @version 1.1
+ * @data 2021-09-26
  * @author tao
  * */
 public class Aggregator implements Runnable {
@@ -22,9 +23,9 @@ public class Aggregator implements Runnable {
     private final ConcurrentLinkedQueue<Batch> flushBatchQueue = new ConcurrentLinkedQueue<>();
     private volatile CountDownLatch waitPoint = new CountDownLatch(1);
     private final IndexHandle indexHandle;
+    // 默认一次force包含几个batch
+    private final int fetchBatch = 5;
     private final Logger logger = LogManager.getLogger(Aggregator.class.getName());
-    // 并发不同点位点位写的线程池
-    private final ExecutorService writerPool = Executors.newFixedThreadPool(15);
 
     public Aggregator(IndexHandle indexHandle) {
         this.indexHandle = indexHandle;
@@ -55,25 +56,20 @@ public class Aggregator implements Runnable {
      * 进行持久化处理*/
     @Override
     public void run() {
-        Batch head = null;
         while (true) {
-            head = flushBatchQueue.peek();
-            if (head != null) {
-                // 启动一个task去刷盘
-                writerPool.execute(this::doFlush);
-            } else { //队列为空，但是batch不空，一种是没有再多的队列让这个batch再增大， 另一种是还在增长
-                int batchSize = batch.getBatchSize();
+            if (flushBatchQueue.size() < 5) {
+                int queueSize = flushBatchQueue.size();
                 try {
                     Thread.sleep(1);
                 } catch (Exception e) {
-                    logger.error(""+e.toString());
+                    logger.error("aggregator wait queue, "+e.toString());
                 }
-                // batch的大小没有变化, 已经不再能聚合线程，加入queue准备force
-                if (batchSize == batch.getBatchSize()) {
-                    flushBatchQueue.offer(batch);
-                    // 新建另一个batch接收新的req
-                    batch = new Batch();
+                // queue的数量不再增长、刷盘当前、唤醒等待countDown的线程
+                if (queueSize == flushBatchQueue.size()) {
+                    doFlush();
                 }
+            } else {
+                doFlush();
             }
         }
     }
@@ -85,30 +81,37 @@ public class Aggregator implements Runnable {
     private void doFlush() {
         long t = System.nanoTime();
 
-        Batch flushBatch = flushBatchQueue.poll();
-        if (flushBatch == null || flushBatch.isEmpty())  return;
-        int off = 0, size;
+        ArrayList<byte[]> superBatchData = new ArrayList<>();
+        ArrayList<MessagePutRequest> superBatch = new ArrayList<>();
 
-        // 遍历batch中的每一个request
-        ByteBuffer buffer = ByteBuffer.allocate(flushBatch.getBatchSize());
-        for (MessagePutRequest msg : flushBatch) {
-            size = msg.getMessage().getData().length;
-            // put data
-            buffer.put(msg.getMessage().getData(), 0, size);
-            off += size;
+        // 将batch从queue中取出组成superBatch， 按顺序将每个batch的message data保存
+        for (int i = 0; i < fetchBatch; i++) {
+            Batch flushBatch = flushBatchQueue.poll();
+            // 不够fetchBatch，先刷盘
+            if (flushBatch == null)  break;
+            while (flushBatch.peek() != null) {
+                MessagePutRequest req = flushBatch.poll();
+                superBatchData.add(req.getMessage().getData());
+                superBatch.add(req);
+            }
         }
 
+        if (superBatchData.isEmpty()) return;
+
         // 刷盘 ->
-        long sOff = SSDWriterReader4.getInstance().write(buffer.array());
+        long sOff = SSDWriterReader3.getInstance().append(superBatchData);
+
         // 更新index
-        for (MessagePutRequest msg : flushBatch) {
+        for (MessagePutRequest msg : superBatch) {
             indexHandle.newIndex(msg.getMessage().getHashKey(), sOff, (short) msg.getMessage().getData().length);
             sOff += msg.getMessage().getData().length;
         }
+
         // force index
         indexHandle.force();
+
         // 通知写入线程落盘完成
-        for (MessagePutRequest msg:flushBatch) {
+        for (MessagePutRequest msg : superBatch) {
             msg.countDown();
         }
         System.out.println("flush time: "+(System.nanoTime()-t));

@@ -11,6 +11,7 @@ import io.openmessaging.ssd.aggregator.Aggregator;
 import io.openmessaging.ssd.aggregator.Message4Flush;
 import io.openmessaging.ssd.aggregator.MessagePutRequest;
 import io.openmessaging.ssd.util.IndexHandle;
+import io.openmessaging.ssd.util.SSDWriterReader3;
 import io.openmessaging.ssd.util.SSDWriterReader4;
 import io.openmessaging.util.ByteBufferUtil;
 import io.openmessaging.util.MapUtil;
@@ -29,7 +30,7 @@ public class Manager {
     // aep冷空间和热空间
     private final PMemSpace2 coolBlock;
     private final PMemSpace2 hotBlock;
-    private final SSDWriterReader4 ssdWriterReader = SSDWriterReader4.getInstance();
+    private final SSDWriterReader3 ssdWriterReader = SSDWriterReader3.getInstance();
     // 保存每个冷queue在aep冷空间的最后一个offset值以及当前冷队列使用了多少aep空间
     private final ConcurrentHashMap<String, Map<Integer, PriorityNode>> coldTopicQueuePriMap = new ConcurrentHashMap<>();
     // 获取到topic+qid下当前插入数据数的offset

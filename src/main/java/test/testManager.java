@@ -46,17 +46,15 @@ public class testManager {
 
         ExecutorService executorService = Executors.newFixedThreadPool(10);
 
-//        for (int i = 0; i < 15; i++) {
-//            executorService.submit(new WriterRunner(manager, i));
-//        }
-//
-//        try {
-//            Thread.sleep(5000);
-////            thread1.join();
-////            thread.join();
-//        } catch (Exception e) {
-//            System.out.println(e.toString());
-//        }
+        for (int i = 0; i < 15; i++) {
+            executorService.submit(new WriterRunner(manager, i));
+        }
+
+        try {
+            Thread.sleep(15000);
+        } catch (Exception e) {
+            System.out.println(e.toString());
+        }
 
         testParallelRead(manager, "test0", 0, 0, 40, "test1", 0, 0, 150);
         System.out.println();
@@ -138,7 +136,7 @@ public class testManager {
      */
     static void testSequentWrite(Manager manager, String topic, int qid, int s, int e) {
         for (int i = s; i < e; i++) {
-            ByteBuffer data = ByteBuffer.allocate(4096);
+            ByteBuffer data = ByteBuffer.allocate(8192);
             data.putInt(i);
             manager.append(topic, qid, data);
         }

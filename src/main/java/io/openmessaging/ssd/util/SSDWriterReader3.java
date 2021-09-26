@@ -17,9 +17,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * 单线程方式和Aggregator对接
+ * 单线程方式和Aggregator对接, 顺序写盘，聚合多条batch的byte[] 一次force
+ * @version 1.1
  * @author tao
- * @date 2021-09-22*/
+ * @date 2021-09-26*/
 public class SSDWriterReader3 {
     // 单例
     private static SSDWriterReader3 instance = new SSDWriterReader3();
@@ -95,6 +96,47 @@ public class SSDWriterReader3 {
         }
 
         return ByteBuffer.wrap(b);
+    }
+    /**
+     * 多batch一force*/
+    public long append(ArrayList<byte[]> bytesArray) {
+        // 写入点
+        long writeStartOffset = finalPhyOffset.get();
+        // 这批数据的总大小
+        int dataSize = 0;
+        // 当前已经创建的datafile数量
+        int listSize = fileList.size();
+        RandomAccessFile raf;
+        FileChannel channel = null;
+
+        try {
+            for (byte[] data : bytesArray) {
+                dataSize += data.length;
+                // 超出默认的一个data partition的大小或首个partition，新建一个分区
+                if (listSize == 0 || fileList.get(listSize-1).length()+data.length > StorageSize.GB) {
+                    // 记录上一个datafile的累计phyOffset
+                    if (listSize != 0 && fileList.get(listSize-1).length()+data.length > StorageSize.GB) {
+                        // 将上一个channel中的数据force
+                        channel.force(true);
+                        accumulativePhyOffset.add(finalPhyOffset.get());
+                    }
+                    String fileName = PartitionMaker.makePartitionPath(listSize, 5, 1)+".data";
+                    raf = new RandomAccessFile(dataFileDir+"/"+fileName, "rws");
+                    fileList.add(raf);
+                    channel = raf.getChannel();
+                } else {
+                    raf = fileList.get(listSize-1);
+                    channel = fileList.get(listSize-1).getChannel();
+                }
+                channel.write(ByteBuffer.wrap(data));
+            }
+            channel.force(true);
+        } catch (Exception e) {
+            logger.error("try to get file length fail, "+e.toString());
+        }
+
+        finalPhyOffset.addAndGet(dataSize);
+        return writeStartOffset;
     }
 
     /**
