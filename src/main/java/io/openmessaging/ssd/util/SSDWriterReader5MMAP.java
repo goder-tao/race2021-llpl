@@ -1,0 +1,156 @@
+package io.openmessaging.ssd.util;
+
+import io.openmessaging.constant.MntPath;
+import io.openmessaging.constant.StorageSize;
+import io.openmessaging.ssd.index.IndexHandle;
+import io.openmessaging.util.PartitionMaker;
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicLong;
+
+/**
+ * 每次重新打开一个使用mmap写
+ * @author tao
+ * @date 2021-09-30*/
+public class SSDWriterReader5MMAP {
+    // 单例
+    private static SSDWriterReader5MMAP instance = new SSDWriterReader5MMAP();
+    // 用一个list保存按创建顺序添加的文件raf对象，留给read复用
+    private ArrayList<RandomAccessFile> fileList = new ArrayList<>();
+    // 记录到当前datafile的总偏移量，read时的精确定位文件
+    private ArrayList<Long> accumulativePhyOffset = new ArrayList<>();
+    // 记录所有datafile的偏移量之和, 计算当前的写入点
+    private AtomicLong finalPhyOffset = new AtomicLong(0);
+    // datafile保存的根目录
+    private final String dataFileDir = MntPath.DATA_FILE_DIR;
+    // 当前datafile的mmap
+    private  MappedByteBuffer mmap;
+
+    private static final Logger logger = LogManager.getLogger(SSDWriterReader5.class.getName());
+
+    private SSDWriterReader5MMAP() {
+        File dir = new File(dataFileDir);
+        if (!dir.exists()) {
+            dir.mkdirs();
+        }
+        String[] fileNames = dir.list();
+        // 文件名排序
+        if (fileNames != null) {
+            Arrays.sort(fileNames);
+        }
+        // 构造list
+        try {
+            // 模拟第0个文件，大小为0，使得List的index逻辑上和文件的排序相同，比如index-1对应第一个文件
+            accumulativePhyOffset.add(0L);
+            fileList.add(null);
+            if (fileNames != null) {
+                for (int i = 0; i < fileNames.length; i++) {
+                    RandomAccessFile file = new RandomAccessFile(dataFileDir+fileNames[i], "rw");
+                    finalPhyOffset.addAndGet(file.length());
+                    accumulativePhyOffset.add(finalPhyOffset.get());
+                    fileList.add(file);
+                    // 获取最新文件的mmap
+                    if (i == fileNames.length-1) {
+                        mmap = file.getChannel().map(FileChannel.MapMode.READ_WRITE, 0, StorageSize.GB);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            logger.fatal("Open partition data fail, "+e.toString());
+        }
+    }
+
+    /**
+     * 根据hashKey直接获取到消息*/
+    public ByteBuffer directRead(int hashKey) {
+        ByteBuffer offAndSize =  IndexHandle.getInstance().getPhyOffsetAndSize(hashKey);
+        if (offAndSize == null) return null;
+        offAndSize.rewind();
+        long off = offAndSize.getLong();
+        short size = offAndSize.getShort();
+        return read(off, size);
+    }
+
+    /**
+     * 根据phyOffset定位到指定的文件，根据一个分区文件的默认大小(1G)
+     * 模糊定位，再进行一次文件的确认*/
+    public ByteBuffer read(long phyOffset, short size) {
+        byte[] b = new byte[size];
+        // 读数据的起点
+        int off;
+        // 粗略定位逻辑上的第几个文件
+        int fileIndex = (int) (phyOffset/ StorageSize.GB)+1;
+
+        // 精确定位，看读取的offset和对应datafile的累积offset之间的关系
+        if (accumulativePhyOffset.size() != 1 && accumulativePhyOffset.get(fileIndex) < phyOffset) {
+            fileIndex++;
+        }
+
+//        off = fileIndex == 1 ? (int) phyOffset : (int) (phyOffset - accumulativePhyOffset.get(fileIndex - 1));
+
+        off = (int) (phyOffset - accumulativePhyOffset.get(fileIndex-1));
+
+        try {
+            fileList.get(fileIndex).seek(off);
+            fileList.get(fileIndex).read(b, 0, b.length);
+        } catch (Exception e) {
+            logger.error("fileList get fail, "+e.toString());
+        }
+        return ByteBuffer.wrap(b);
+    }
+
+    /**
+     * 单线程顺序写入
+     * @return: 本次写入的起点和用于force的mmap对象*/
+    public AppendRes2 append(byte[] data) {
+        // 写入点
+        long writeStartOffset = finalPhyOffset.getAndAdd(data.length);
+        int listSize = fileList.size()-1;
+        RandomAccessFile raf = null;
+
+        try {
+            // 当前上写入点+写入的长度-上一个文件的累积offset，计算当前文件的大小，超出默认的一个data partition的大小，新建一个分区
+            if (listSize == 0 || (writeStartOffset-accumulativePhyOffset.get(listSize-1))+data.length > StorageSize.GB) {
+
+                if (listSize != 0) {
+                    // 记录上一个datafile的累计phyOffset
+                    accumulativePhyOffset.add(writeStartOffset);
+                }
+
+                // 新建一个datafile
+                String fileName = PartitionMaker.makePartitionPath(listSize, 5, 1)+".data";
+                raf = new RandomAccessFile(dataFileDir+"/"+fileName, "rw");
+                fileList.add(raf);
+
+                // 截掉上一个datafile因为mmap创建出来多余的部分
+                if (fileList.get(listSize) != null) {
+                    fileList.get(listSize).getChannel().truncate(writeStartOffset-accumulativePhyOffset.get(listSize-1));
+                }
+                // 建立新的mmap
+                mmap = raf.getChannel().map(FileChannel.MapMode.READ_WRITE, 0, StorageSize.GB);
+                listSize++;
+            }
+
+            // 写入
+            mmap.position((int) (writeStartOffset-accumulativePhyOffset.get(listSize-1)));
+            mmap.put(data);
+        } catch (IOException e) {
+            logger.error("try to get file length fail, "+e.toString());
+        }
+
+        return new AppendRes2(mmap, writeStartOffset);
+    }
+
+    public static SSDWriterReader5MMAP getInstance() {
+        return instance;
+    }
+}

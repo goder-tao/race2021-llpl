@@ -12,6 +12,8 @@ public class MessagePutRequest {
     private CountDownLatch wait;
     private Message4Flush message;
 
+    private long downTime;
+
     public MessagePutRequest(Message4Flush message) {
         this.message = message;
         wait = new CountDownLatch(1);
@@ -22,14 +24,18 @@ public class MessagePutRequest {
      * 位置调用*/
     public void getResponse() {
         try {
+            long t = System.nanoTime();
             wait.await();
+//            System.out.println("receive countDown: "+(System.nanoTime()-downTime));
+//            System.out.println("await time: "+(System.nanoTime()-t));
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    protected void countDown() {
+    protected void countDown(long downTime) {
         wait.countDown();
+        this.downTime = downTime;
     }
 
     public Message4Flush getMessage() {

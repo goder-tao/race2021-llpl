@@ -1,50 +1,58 @@
 package io.openmessaging.ssd.aggregator;
 
-import io.openmessaging.ssd.util.SSDWriterReader3;
-import io.openmessaging.ssd.util.IndexHandle;
-import io.openmessaging.ssd.util.SSDWriterReader4;
+import io.openmessaging.ssd.index.IndexHandle;
+import io.openmessaging.ssd.util.AppendRes2;
+import io.openmessaging.ssd.util.SSDWriterReader5MMAP;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
+import java.nio.MappedByteBuffer;
 import java.util.concurrent.*;
 
 /**
- * 向上聚合多个thread的数据，默认8kb聚合，向下调用底层
- * disk写接口写入一批数据。默认5batch数据force一次
- * @version 1.1
- * @data 2021-09-26
+ * 向上聚合多个thread的数据，默认8kb聚合，向下调用底层disk写接口写入一批数据
+ * 使用线程池异步force，在task中并行进行index以及write data的force，并在
+ * 结束之后通知put线程任务完成
+ * @version 1.2
+ * @data 2021-09-30
  * @author tao
  * */
 public class Aggregator implements Runnable {
     private volatile Batch batch = new Batch();
     // 等待落盘的batch队列
     private final ConcurrentLinkedQueue<Batch> flushBatchQueue = new ConcurrentLinkedQueue<>();
-    private volatile CountDownLatch waitPoint = new CountDownLatch(1);
+
     private final IndexHandle indexHandle;
-    // 默认一次force包含几个batch
-    private final int fetchBatch = 5;
+
     private final Logger logger = LogManager.getLogger(Aggregator.class.getName());
+    // 线程池、异步force
+    private final ExecutorService executor = Executors.newFixedThreadPool(10);
+    // 并行index force线程池
+    private final ExecutorService forceExecutor = Executors.newFixedThreadPool(10);
+    // 使用一个信号量进行唤醒
+    private final Semaphore waitPoint = new Semaphore(0);
 
     public Aggregator(IndexHandle indexHandle) {
         this.indexHandle = indexHandle;
-        flushBatchQueue.offer(batch);
     }
 
     /**
-     * 添加一个request，尝试向当前batch添加一个request, 如果添加后的结果
-     * 超过8kb，则将原batch加入flush queue，新建一个batch添加当前request,
-     * 并且通知刷盘程序刷盘*/
+     * 添加一个request，尝试向当前batch添加一个request, batch的最大size根据第一个加入
+     * batch的req决定，size都为8kb的整数倍. 如果加入当前batch失败则将当前batch加入flush
+     * queue，并新建一个batch添加当前req
+     * */
     public synchronized void putMessageRequest(MessagePutRequest req) {
         // 当前batch已经满了，需要进行刷盘
         if (!this.batch.tryToAdd(req)) {
             flushBatchQueue.offer(batch);
             batch = new Batch();
+            waitPoint.release();
             batch.tryToAdd(req);
         } else if (batch.isCanFlush()) {
             flushBatchQueue.offer(batch);
             batch = new Batch();
+            waitPoint.release();
         }
     }
 
@@ -57,85 +65,96 @@ public class Aggregator implements Runnable {
     @Override
     public void run() {
         while (true) {
-            if (flushBatchQueue.size() < 5) {
-                int queueSize = flushBatchQueue.size();
-                try {
-                    Thread.sleep(1);
-                } catch (Exception e) {
-                    logger.error("aggregator wait queue, "+e.toString());
+            try {
+                // 尝试获取信号量并等待一个比较长的时间，用来处理最后一条消息
+                if (!waitPoint.tryAcquire(200, TimeUnit.MILLISECONDS)) {
+                    flushBatchQueue.offer(batch);
+                    batch = new Batch();
                 }
-                // queue的数量不再增长、刷盘当前、唤醒等待countDown的线程
-                if (queueSize == flushBatchQueue.size()) {
-                    doFlush();
-                }
-            } else {
                 doFlush();
+            } catch (Exception e) {
+                e.printStackTrace();
+                logger.error("aggregator waitPoint, "+e.toString());
             }
         }
     }
 
     /**
-     * 按照字段组合batch中的数据，调用disk接口进行append写入，生成
-     * index更新，最终调用indexfile的mmap进行刷盘，接着通知所有request
-     * 刷盘已经完成，异步任务完成*/
+     * 异步force任务，datafile和index并行force， */
+    private class ForceTask implements Runnable{
+//        private RandomAccessFile raf;
+        private MappedByteBuffer mmap;
+        private Batch flushBatch;
+        private volatile CountDownLatch forceCountDown = new CountDownLatch(1);
+
+        ForceTask(MappedByteBuffer mmap, Batch flushBatch) {
+            this.mmap = mmap;
+            this.flushBatch = flushBatch;
+        }
+
+        @Override
+        public void run() {
+            // 并行 force index mmap
+            forceExecutor.execute(() -> {
+                IndexHandle.getInstance().force();
+                forceCountDown.countDown();
+            });
+
+            // force datafile
+            mmap.force();
+//            try {
+//                raf.getChannel().force(true);
+//                raf.close();
+//            } catch (IOException e) {
+//                e.printStackTrace();
+//            }
+
+            try {
+                forceCountDown.await();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+            // 通知put线程持久化完成
+            for (MessagePutRequest req:flushBatch) {
+                req.countDown(System.nanoTime());
+            }
+        }
+    }
+
+    /**
+     * 按照字段组合batch中的数据，调用disk接口进行append写入，更新index，
+     * 接着开启异步任务进行datafile和index的并行force，在异步任务中通知
+     * put线程任务完成*/
     private void doFlush() {
         long t = System.nanoTime();
+        Batch flushBatch = flushBatchQueue.poll();
+        if (flushBatch == null || flushBatch.isEmpty()) return;
 
-        ArrayList<byte[]> superBatchData = new ArrayList<>();
-        ArrayList<MessagePutRequest> superBatch = new ArrayList<>();
-
-        // 将batch从queue中取出组成superBatch， 按顺序将每个batch的message data保存
-        for (int i = 0; i < fetchBatch; i++) {
-            Batch flushBatch = flushBatchQueue.poll();
-            // 不够fetchBatch，先刷盘
-            if (flushBatch == null)  break;
-            while (flushBatch.peek() != null) {
-                MessagePutRequest req = flushBatch.poll();
-                superBatchData.add(req.getMessage().getData());
-                superBatch.add(req);
-            }
+        ByteBuffer dataBuffer = ByteBuffer.allocate(flushBatch.getBatchSize());
+        for (MessagePutRequest req:flushBatch) {
+            dataBuffer.put(req.getMessage().getData());
         }
 
-        if (superBatchData.isEmpty()) return;
+        // 刷盘
+        AppendRes2 appendRes = SSDWriterReader5MMAP.getInstance().append(dataBuffer.array());
+        long sOff = appendRes.getWriteStartOffset();
+        MappedByteBuffer mmap = appendRes.getMmap();
 
-        // 刷盘 ->
-        long sOff = SSDWriterReader3.getInstance().append(superBatchData);
+//        System.out.println("append time: "+(System.nanoTime()-t));
+        t = System.nanoTime();
 
         // 更新index
-        for (MessagePutRequest msg : superBatch) {
-            indexHandle.newIndex(msg.getMessage().getHashKey(), sOff, (short) msg.getMessage().getData().length);
-            sOff += msg.getMessage().getData().length;
+        for (MessagePutRequest req:flushBatch) {
+            indexHandle.newIndex(flushBatch.peek().getMessage().getHashKey(), sOff, (short) req.getMessage().getData().length);
+            sOff += req.getMessage().getData().length;
         }
 
-        // force index
-        indexHandle.force();
+//        System.out.println("new index time: "+(System.nanoTime()-t));
+        t = System.nanoTime();
 
-        // 通知写入线程落盘完成
-        for (MessagePutRequest msg : superBatch) {
-            msg.countDown();
-        }
-        System.out.println("flush time: "+(System.nanoTime()-t));
-    }
+        executor.submit(new ForceTask(mmap, flushBatch));
 
-    /**
-     * 手动唤醒刷盘进程*/
-    private void wakeUp() {
-        waitPoint.countDown();
-    }
-
-    /**
-     * 设置一个刷盘等待时间，以防多个线程的data batch无法达到设定的batch最大值而一直阻塞,
-     * 或者另一个就是被wakeup给唤醒*/
-    private void waitForFlush(int waitMillSecond) {
-        try {
-            waitPoint.await(waitMillSecond, TimeUnit.MILLISECONDS);
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            // 减少创建新对象
-            if (waitPoint.getCount() == 0) {
-                waitPoint = new CountDownLatch(1);
-            }
-        }
+//        System.out.println("execute task time: "+(System.nanoTime()-t));
     }
 }

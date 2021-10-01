@@ -2,6 +2,7 @@ package io.openmessaging.ssd.util;
 
 import io.openmessaging.constant.MntPath;
 import io.openmessaging.constant.StorageSize;
+import io.openmessaging.ssd.index.IndexHandle;
 import io.openmessaging.util.PartitionMaker;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
@@ -13,7 +14,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -33,7 +33,7 @@ public class SSDWriterReader3 {
     // datafile保存的根目录
     private final String dataFileDir = MntPath.DATA_FILE_DIR;
 
-    private final Logger logger = LogManager.getLogger(SSDWriterReader3.class.getName());
+    private static final Logger logger = LogManager.getLogger(SSDWriterReader3.class.getName());
 
     private SSDWriterReader3() {
         File dir = new File(dataFileDir);
@@ -121,7 +121,7 @@ public class SSDWriterReader3 {
                         accumulativePhyOffset.add(finalPhyOffset.get());
                     }
                     String fileName = PartitionMaker.makePartitionPath(listSize, 5, 1)+".data";
-                    raf = new RandomAccessFile(dataFileDir+"/"+fileName, "rws");
+                    raf = new RandomAccessFile(dataFileDir+"/"+fileName, "rw");
                     fileList.add(raf);
                     channel = raf.getChannel();
                 } else {
@@ -157,17 +157,16 @@ public class SSDWriterReader3 {
                     accumulativePhyOffset.add(finalPhyOffset.get());
                 }
                 String fileName = PartitionMaker.makePartitionPath(listSize, 5, 1)+".data";
-                 raf = new RandomAccessFile(dataFileDir+"/"+fileName, "rws");
+                 raf = new RandomAccessFile(dataFileDir+"/"+fileName, "rw");
                 fileList.add(raf);
-//                channel = raf.getChannel();
+                channel = raf.getChannel();
             } else {
                 raf = fileList.get(listSize-1);
-//                channel = fileList.get(listSize-1).getChannel();
+                channel = fileList.get(listSize-1).getChannel();
             }
             // 持久化
-//            channel.write(ByteBuffer.wrap(data));
-//            channel.force(true);
-            raf.write(data);
+            channel.write(ByteBuffer.wrap(data));
+            channel.force(true);
         } catch (IOException e) {
             logger.error("try to get file length fail, "+e.toString());
         }
