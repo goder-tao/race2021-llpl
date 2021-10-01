@@ -14,7 +14,7 @@ import java.util.Random;
 
 public class testManager {
     public static void main(String[] args) {
-        testScheduler();
+        testParallel();
     }
 
     /**
