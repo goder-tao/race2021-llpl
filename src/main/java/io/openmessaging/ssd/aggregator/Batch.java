@@ -1,11 +1,8 @@
 package io.openmessaging.ssd.aggregator;
 
-import io.openmessaging.constant.MntPath;
 import io.openmessaging.constant.StorageSize;
 
-import java.util.ArrayList;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -25,16 +22,17 @@ public class Batch extends ConcurrentLinkedQueue<MessagePutRequest> {
      * 尝试向batch的尾部添加一个req，如果添加后的大小超过batch的默认大小返回false，
      * 否则将req加入queue并返回true*/
     public boolean tryToAdd(MessagePutRequest req) {
-        // 首个加入batch的req作为head，这个head决定这个batch的聚合上限
+        // 首个加入batch的req作为head，这个head决定这个batch的聚合上限, 8kb, 16kb or 24kb
         if (this.isEmpty()) {
-            if (req.getMessage().getData().length <= 8*StorageSize.KB) {
-                batchSizeLimit = (int) (8*StorageSize.KB);
-            } else if (req.getMessage().getData().length <= 16*StorageSize.KB) {
-                batchSizeLimit = (int) (16*StorageSize.KB);
+            if (req.getMessage().getData().length <= StorageSize.SMALL_BATCH_SIZE) {
+                batchSizeLimit = StorageSize.SMALL_BATCH_SIZE;
+            } else if (req.getMessage().getData().length <= StorageSize.MIDDLE_BATCH_SIZE) {
+                batchSizeLimit = StorageSize.MIDDLE_BATCH_SIZE;
             } else {
-                batchSizeLimit = (int) (24*StorageSize.KB);
+                batchSizeLimit = StorageSize.LARGE_BATCH_SIZE;
             }
         }
+
         if (req.getMessage().getData().length+batchSize.get() <= batchSizeLimit) {
             super.add(req);
             batchSize.addAndGet(req.getMessage().getData().length);
@@ -48,6 +46,6 @@ public class Batch extends ConcurrentLinkedQueue<MessagePutRequest> {
     }
 
     public boolean isCanFlush() {
-        return batchSize.get() == batchSizeLimit;
+        return batchSize.get() >= batchSizeLimit;
     }
 }

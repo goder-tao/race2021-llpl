@@ -2,6 +2,7 @@ package io.openmessaging.ssd.util;
 
 import io.openmessaging.constant.MntPath;
 import io.openmessaging.constant.StorageSize;
+import io.openmessaging.ssd.index.IndexHandle;
 import io.openmessaging.util.PartitionMaker;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
@@ -10,9 +11,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
-import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;

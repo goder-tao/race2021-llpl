@@ -2,256 +2,274 @@ package test;
 
 import io.openmessaging.constant.MntPath;
 import io.openmessaging.constant.StorageSize;
-import io.openmessaging.ssd.util.IndexHandle;
-import io.openmessaging.ssd.util.SSDWriterReader;
 
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
-import java.nio.channels.Channel;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
-import java.sql.Wrapper;
-import java.util.Arrays;
 import java.util.Random;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
-
-
-class Node {
-    int i;
-    String name;
-    Node(String name, int i) {
-        this.i = i;
-        this.name = name;
-    }
-}
-
-class NodeWrap {
-    Node node;
-    NodeWrap(Node node) {
-        this.node = node;
-    }
-}
+import java.util.concurrent.atomic.AtomicLong;
 
 public class test {
-    public static void main(String[] args) throws IOException {
-        writeTest();
-    }
 
+    // 半秒顺序写 300+MB文件  600+MB/s
     static void writeTest() {
         try {
-            RandomAccessFile raf = new RandomAccessFile(MntPath.SSD_PATH+"test", "rws");
+            RandomAccessFile raf = new RandomAccessFile(MntPath.SSD_PATH+"test", "rw");
             FileChannel channel = raf.getChannel();
-            Random random = new Random();
+            int writeTimes = 5000;
+            int writeSize = 8100;
             long t = System.nanoTime();
-            for (int i = 0; i < 1280; i++) {
-//                channel.write(ByteBuffer.wrap(new byte[4000+random.nextInt(100)]));
-//                channel.force(true);
-                raf.write(new byte[4000+random.nextInt(100)]);
+            long ft = 0;
+            for (int i = 0; i < writeTimes; i++) {
+                channel.write(ByteBuffer.wrap(new byte[writeSize]));
+                long t1 = System.nanoTime();
+                channel.force(true);
+                ft += System.nanoTime()-t1;
             }
-            System.out.println("spend time of writing 50MB: "+(System.nanoTime()-t));
+
+            long totalTime = System.nanoTime() - t;
+
+            System.out.println("total time: "+totalTime);
+            System.out.println("total time of writing: "+(totalTime-ft));
+            System.out.println("total time of force: "+(ft));
+            System.out.println("average time of writing: "+(totalTime-ft)/writeTimes);
+            System.out.println("average time of force: "+ft/writeTimes);
+
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
     /**
-     * 读超过RandomAccessFile范围测试*/
-    static void outOfRandomAccessFileRangeRead() {
-        try {
-            RandomAccessFile file = new RandomAccessFile(MntPath.SSD_PATH+"test", "r");
-            byte[] b = new byte[10];
-            file.read(b);
-            ByteBuffer buffer = ByteBuffer.allocate(b.length);
-            buffer.put(b);
-            buffer.rewind();
-            System.out.println(buffer.getLong());
-            System.out.println(buffer.getShort());
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    /**
-     * 测试flush不关闭流使用rfile实时获取文件长度*/
-    static void testInTimeFileLength() throws IOException {
-        final String path = MntPath.SSD_PATH+"test";
-        for (int i = 0; i < 10; i++) {
-            Thread thread = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    RandomAccessFile rfile;
-                    BufferedOutputStream outputStream = null;
-                    Random random = new Random();
-                    int r = random.nextInt(1000);
-                    try {
-                        outputStream = new BufferedOutputStream(new FileOutputStream(path+r));
-                        for (int i = 0; i < 1000000; i++) {
-                            byte[] b = new byte[10];
-                            outputStream.write(b);
-                            outputStream.flush();
-                            rfile = new RandomAccessFile(path+r, "r");
-                            if (rfile.length() != (i+1)*10) {
-                                System.out.println("in time file length not equal");
-                            }
-                            rfile.close();
-                        }
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    } finally {
-                        try {
-                            outputStream.close();
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                }
-            });
-            thread.start();
-        }
-
-    }
-
-    /**
-     * 测试flush不关闭流使用rfile实时获取文件长度*/
-    static void testForceWithoutClose() throws IOException {
-        final String path = MntPath.SSD_PATH+"test";
-        for (int i = 0; i < 1; i++) {
-            Thread thread = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    int writeTime = 1000;
-                    RandomAccessFile rfile = null;
-                    BufferedOutputStream outputStream = null;
-                    Random random = new Random();
-                    int r = random.nextInt(1000);
-                    try {
-                        rfile = new RandomAccessFile(path+r, "rw");
-                        FileChannel channel = rfile.getChannel();
-                        long t = System.nanoTime();
-                        for (int i = 0; i < writeTime; i++) {
-                            byte[] b = new byte[1024*2];
-                            rfile.seek(random.nextInt(1000));
-                            rfile.read(b);
-                        }
-                        System.out.println("average write time: "+(System.nanoTime()-t)/writeTime+"ns");
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                }
-            });
-            thread.start();
-        }
-
-    }
-
-    /**
-     * 使用CAS保证并发的正确性测试*/
-    static void atomicTest() {
-        AtomicBoolean atomicBoolean = new AtomicBoolean(false);
-        final int[]  i = new int[1];
-        for (int j = 0; j < 1000000; j++) {
-            atomicBoolean.set(false);
-            i[0] = 0;
-            Thread thread = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    if (atomicBoolean.compareAndSet(false, true)) {
-                        atomicBoolean.set(true);
-                        i[0]++;
-                    }
-                }
-            }), thread1 = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    if (atomicBoolean.compareAndSet(false, true)) {
-                        atomicBoolean.set(true);
-                        i[0]++;
-                    }
-                }
-            });
-            try {
-                thread.start();
-                thread1.start();
-                thread1.join();
-                thread.join();
-            } catch (Exception e) {
-                System.out.println(e.toString());
-            }
-            if (i[0] == 2) {
-                System.out.println("!!!");
-            }
-        }
-    }
-
-    /**
-     * 并发写磁盘*/
-    static void diskPressureTest() {
-        SSDWriterReader ssdWriterReader = new SSDWriterReader();
-        for (int i = 0; i < 10; i++) {
-            Thread thread = new Thread(new Runnable() {
+     * 并发写磁盘
+     * 1、利用点位并发写同一个文件+force -> 2MB/s
+     * 2、一个文件8kb写+每次force -> 15MB/s
+     * 3、并发点位并发写同一个文件不force，并发非顺序写 -> 600MB/s
+     * */
+    static void testParallelWriteSame() {
+        AtomicLong off = new AtomicLong(0);
+        int threadCount = 4;
+        Thread[] threads = new Thread[threadCount];
+        long t = System.nanoTime();
+        for (int i = 0; i < threads.length; i++) {
+            threads[i] = new Thread(new Runnable() {
                 @Override
                 public void run() {
                     Random random = new Random();
                     long startTime = System.nanoTime();
-                    int fi = random.nextInt(10000);
-                    for (int i = 0; i < 10000; i++) {
-                        ssdWriterReader.append(MntPath.SSD_PATH, "test"+fi, ByteBuffer.allocate((int) StorageSize.KB).array());
+                    int fi = random.nextInt(8192);
+                    int writeTimes = 10000;
+                    int writeSize = 8100;
+
+                    try {
+                        RandomAccessFile raf = new RandomAccessFile(MntPath.SSD_PATH+"test", "rw");
+                        FileChannel channel = raf.getChannel();
+                        for (int i = 0; i < writeTimes; i++) {
+                            long offset = off.getAndAdd(writeSize);
+                            channel.write(ByteBuffer.wrap(new byte[writeSize]), offset);
+//                            if ((i+1)%5==0){
+//                                channel.force(true);
+//                            }
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
                     }
-                    System.out.println("Average write time: "+(System.nanoTime()-startTime)/10000+"ns");
+
+                    System.out.println("Average write time: "+(System.nanoTime()-startTime)/writeTimes+"ns");
                 }
             });
-            thread.start();
+            threads[i].start();
         }
+
+        for (int i = 0; i < threads.length; i++) {
+            try {
+                threads[i].join();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        System.out.println("total time: "+(System.nanoTime()-t));
     }
 
-
-    public static void test() {
-        ConcurrentHashMap<Integer, Integer> map = new ConcurrentHashMap<>();
-        Thread thread = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                if (map.get(1) == null) {
-                    if (map.putIfAbsent(1, 1) != null) {
-                        System.out.println("!!!");
-                    }
-                }
-            }
-        }), thread1 = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                if (map.get(1) == null) {
-                    if (map.putIfAbsent(1, 2) != null) {
-                        System.out.println("!!!");
-                    }
-                }
-            }
-        });
-        thread.start();
-        thread1.start();
-        try {
-            thread.join();
-            thread1.join();
-        } catch (Exception e) {
-
-        }
-//        System.out.println(map.get(1));
-    }
-    static void parallelDir() {
-        for(int i = 0; i < 100; i++) {
-            Thread thread = new Thread(new Runnable() {
+    // 并发顺序写多个文件 -> 10MB/s
+    static void testParallelWriteMultiFile() {
+        int threadCount = 4;
+        Thread[] threads = new Thread[threadCount];
+        long t = System.nanoTime();
+        for (int i = 0; i < threads.length; i++) {
+            threads[i] = new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    File f = new File("/home/tao/Data/sim_SSD/test2");
-                    if (!f.exists()) {
-                        boolean b = f.mkdirs();
-                        if (!b) {
-                            System.out.println("Create dir fail!!");
+                    Random random = new Random();
+                    long startTime = System.nanoTime();
+                    int fi = random.nextInt(8192);
+                    int writeTimes = 5000;
+                    int writeSize = 8100;
+
+                    try {
+                        RandomAccessFile raf = new RandomAccessFile(MntPath.SSD_PATH+"test"+fi, "rw");
+                        FileChannel channel = raf.getChannel();
+                        for (int i = 0; i < writeTimes; i++) {
+                            channel.write(ByteBuffer.wrap(new byte[writeSize]));
+                            channel.force(true);
                         }
+                    } catch (Exception e) {
+                        e.printStackTrace();
                     }
+                    System.out.println("Average write time: "+(System.nanoTime()-startTime)/writeTimes+"ns");
                 }
             });
-            thread.start();
+            threads[i].start();
         }
+
+        for (int i = 0; i < threads.length; i++) {
+            try {
+                threads[i].join();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        System.out.println("total time:"+(System.nanoTime()-t));
+
+    }
+
+    // 并发写同一个mmap -> 10MB/s
+    // 并发写同一个mmap, 每次写入只map对应写入范围的区域 -> 10MB/s
+    static void testParallelWriteSameMMap() {
+        AtomicLong off = new AtomicLong(0);
+        int threadCount = 4;
+        Thread[] threads = new Thread[threadCount];
+        long t = System.nanoTime();
+        for (int i = 0; i < threads.length; i++) {
+            threads[i] = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    Random random = new Random();
+                    long startTime = System.nanoTime();
+                    int fi = random.nextInt(8192);
+                    int writeTimes = 5000;
+                    int writeSize = 8100;
+
+                    try {
+                        RandomAccessFile raf = new RandomAccessFile(MntPath.SSD_PATH+"test", "rw");
+                        FileChannel channel = raf.getChannel();
+                        MappedByteBuffer mmap = channel.map(FileChannel.MapMode.READ_WRITE, 0, 500*StorageSize.MB);
+                        for (int i = 0; i < writeTimes; i++) {
+                            long offset = off.getAndAdd(writeSize);
+                            mmap.position((int) offset);
+                            mmap.put(new byte[writeSize]);
+                            mmap.force();
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+
+                    System.out.println("Average write time: "+(System.nanoTime()-startTime)/writeTimes+"ns");
+                }
+            });
+            threads[i].start();
+        }
+
+        for (int i = 0; i < threads.length; i++) {
+            try {
+                threads[i].join();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        System.out.println("total time:"+(System.nanoTime()-t));
+    }
+
+    // 使用mmap并发写多个文件, 每次只map对应要写入的范围 -> 20MB/s
+    static void testParallelWriteMultiMmapFile() {
+        int threadCount = 4;
+        Thread[] threads = new Thread[threadCount];
+        long t = System.nanoTime();
+        for (int i = 0; i < threads.length; i++) {
+            threads[i] = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    Random random = new Random();
+                    long startTime = System.nanoTime();
+                    int fi = random.nextInt(1000000);
+                    int writeTimes = 5000;
+                    int writeSize = 8100;
+
+                    try {
+                        RandomAccessFile raf = new RandomAccessFile(MntPath.SSD_PATH+"test"+fi, "rw");
+                        FileChannel channel = raf.getChannel();
+                        for (int i = 0; i < writeTimes; i++) {
+                            MappedByteBuffer mmap = channel.map(FileChannel.MapMode.READ_WRITE, i*writeSize, (i+1)*writeSize);
+                            mmap.put(new byte[writeSize]);
+                            mmap.force();
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                    System.out.println("Average write time: "+(System.nanoTime()-startTime)/writeTimes+"ns");
+                }
+            });
+            threads[i].start();
+        }
+
+        for (int i = 0; i < threads.length; i++) {
+            try {
+                threads[i].join();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        System.out.println("total time: "+(System.nanoTime()-t));
+    }
+
+    // 随机写测试 -> 600MB/s
+    static void randomWrite() {
+        int threadCount = 1;
+        Thread[] threads = new Thread[threadCount];
+        long t = System.nanoTime();
+        for (int i = 0; i < threads.length; i++) {
+            threads[i] = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    Random random = new Random();
+                    long startTime = System.nanoTime();
+                    int fi = random.nextInt(1000000);
+                    int writeTimes = 400000;
+                    int writeSize = 8100;
+
+                    try {
+                        RandomAccessFile raf = new RandomAccessFile(MntPath.SSD_PATH+"test"+fi, "rw");
+                        FileChannel channel = raf.getChannel();
+                        for (int i = 0; i < writeTimes; i++) {
+                            int roff = random.nextInt((int) (2000*StorageSize.MB));
+                            channel.write(ByteBuffer.wrap(new byte[writeSize]), roff);
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                    System.out.println("Average write time: "+(System.nanoTime()-startTime)/writeTimes+"ns");
+                }
+            });
+            threads[i].start();
+        }
+
+        for (int i = 0; i < threads.length; i++) {
+            try {
+                threads[i].join();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        System.out.println("total time: "+(System.nanoTime()-t));
+    }
+
+    public static void main(String[] args) throws IOException {
+        writeTest();
     }
 }

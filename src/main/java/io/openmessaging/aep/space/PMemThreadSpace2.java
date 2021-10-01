@@ -102,6 +102,12 @@ public class PMemThreadSpace2 implements Space2{
 
     @Override
     public byte[] read(MemoryNode listNode) {
-        return slots[listNode.slot].get(listNode.key).read(listNode);
+        try {
+            return slots[listNode.slot].get(listNode.key).read(listNode);
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.out.println("slot: "+listNode.slot+", key: "+listNode.key);
+            return null;
+        }
     }
 }

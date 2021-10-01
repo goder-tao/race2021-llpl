@@ -10,27 +10,40 @@ import io.openmessaging.util.SystemMemory;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.Random;
 
 public class testManager {
     public static void main(String[] args) {
-        testParallel();
+        testScheduler();
     }
 
     /**
      * 调度器测试，先写一些数据，写满，再从offset 0开始读所有的数据，
      * 正常情况下返回值会大于coldSpace中所能保存的最大消息数
-     *      strategy: 40MB的pmem空间， 写入数据一次4kb, 写入50MB(12800次)*/
+     *      strategy: 40MB的pmem空间, 写入50MB*/
     static void testScheduler() {
         Manager manager = new Manager();
+
         Thread thread = new Thread(new Runnable() {
             @Override
             public void run() {
-                testSequentWrite(manager, "test", 0, 0, 12800);
-                testSequentRead(manager, "test", 0, 0, 12800);
+                testSequentWrite(manager, "test", 0, 0, 6400);
+                testSequentRead(manager, "test", 0, 0, 3200);
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                testSequentRead(manager, "test", 0, 3201, 4800);
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                testSequentRead(manager, "test", 0, 4801, 6400);
             }
         });
+
         thread.start();
         try {
             thread.join();
@@ -44,16 +57,20 @@ public class testManager {
     static void testParallel() {
         Manager manager = new Manager();
 
-        ExecutorService executorService = Executors.newFixedThreadPool(10);
+        Thread[] threads = new Thread[20];
 
-        for (int i = 0; i < 15; i++) {
-            executorService.submit(new WriterRunner(manager, i));
+        long t = System.nanoTime();
+        for (int i = 0; i < threads.length; i++) {
+            threads[i] = new Thread(new WriterRunner(manager, i));
+            threads[i].start();
         }
 
-        try {
-            Thread.sleep(15000);
-        } catch (Exception e) {
-            System.out.println(e.toString());
+        for (int i = 0; i < threads.length; i++) {
+            try {
+                threads[i].join();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
 
         testParallelRead(manager, "test0", 0, 0, 40, "test1", 0, 0, 150);
@@ -69,6 +86,7 @@ public class testManager {
             this.i = i;
             this.manager = manager;
         }
+
         @Override
         public void run() {
             testSequentWrite(manager, "test"+i, 0, 0, 50);
@@ -135,7 +153,9 @@ public class testManager {
      * 串行写数据(yes)
      */
     static void testSequentWrite(Manager manager, String topic, int qid, int s, int e) {
+        Random random = new Random();
         for (int i = s; i < e; i++) {
+            int r = 100 + random.nextInt(17000);
             ByteBuffer data = ByteBuffer.allocate(8192);
             data.putInt(i);
             manager.append(topic, qid, data);
