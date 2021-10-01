@@ -91,11 +91,9 @@ public class SSDWriterReader5MMAP {
         int fileIndex = (int) (phyOffset/ StorageSize.GB)+1;
 
         // 精确定位，看读取的offset和对应datafile的累积offset之间的关系
-        if (accumulativePhyOffset.size() != 1 && accumulativePhyOffset.get(fileIndex) < phyOffset) {
+        if (accumulativePhyOffset.get(fileIndex) != null && accumulativePhyOffset.get(fileIndex) < phyOffset) {
             fileIndex++;
         }
-
-//        off = fileIndex == 1 ? (int) phyOffset : (int) (phyOffset - accumulativePhyOffset.get(fileIndex - 1));
 
         off = (int) (phyOffset - accumulativePhyOffset.get(fileIndex-1));
 
@@ -114,16 +112,23 @@ public class SSDWriterReader5MMAP {
     public AppendRes2 append(byte[] data) {
         // 写入点
         long writeStartOffset = finalPhyOffset.getAndAdd(data.length);
-        int listSize = fileList.size()-1;
+        // listSize总是比accSize大一，因为acc只有当前datafile满的时候才会新增，而list在当前文件未满的时候就已经存在datafile的raf对象了
+        int listSize = fileList.size();
+        int accSize = accumulativePhyOffset.size();
         RandomAccessFile raf = null;
 
         try {
             // 当前上写入点+写入的长度-上一个文件的累积offset，计算当前文件的大小，超出默认的一个data partition的大小，新建一个分区
-            if (listSize == 0 || (writeStartOffset-accumulativePhyOffset.get(listSize-1))+data.length > StorageSize.GB) {
-
-                if (listSize != 0) {
+            if (listSize == 1 || (writeStartOffset-accumulativePhyOffset.get(accSize-1))+data.length > StorageSize.GB) {
+                if (listSize != 1) {
                     // 记录上一个datafile的累计phyOffset
                     accumulativePhyOffset.add(writeStartOffset);
+                    accSize++;
+                }
+
+                // 截掉上一个datafile因为mmap创建出来多余的部分
+                if (fileList.get(listSize-1) != null) {
+                    fileList.get(listSize-1).getChannel().truncate(accumulativePhyOffset.get(accSize-1)-accumulativePhyOffset.get(accSize-2));
                 }
 
                 // 新建一个datafile
@@ -131,17 +136,12 @@ public class SSDWriterReader5MMAP {
                 raf = new RandomAccessFile(dataFileDir+"/"+fileName, "rw");
                 fileList.add(raf);
 
-                // 截掉上一个datafile因为mmap创建出来多余的部分
-                if (fileList.get(listSize) != null) {
-                    fileList.get(listSize).getChannel().truncate(writeStartOffset-accumulativePhyOffset.get(listSize-1));
-                }
                 // 建立新的mmap
                 mmap = raf.getChannel().map(FileChannel.MapMode.READ_WRITE, 0, StorageSize.GB);
-                listSize++;
             }
 
             // 写入
-            mmap.position((int) (writeStartOffset-accumulativePhyOffset.get(listSize-1)));
+            mmap.position((int) (writeStartOffset-accumulativePhyOffset.get(accSize-1)));
             mmap.put(data);
         } catch (IOException e) {
             logger.error("try to get file length fail, "+e.toString());
