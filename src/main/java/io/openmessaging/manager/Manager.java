@@ -93,7 +93,7 @@ public class Manager {
         ByteBuffer b1 = ByteBufferUtil.copyFrom(data);
 
         // 生成MessageRequest
-        int hashKey = (topic+queueId+appendOffset).hashCode();
+        int hashKey = (topic+"#"+queueId+"#"+appendOffset).hashCode();
         Message4Flush message4Flush = new Message4Flush(b1.array(), hashKey);
         MessagePutRequest request = new MessagePutRequest(message4Flush);
 

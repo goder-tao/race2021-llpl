@@ -270,6 +270,9 @@ public class test {
     }
 
     public static void main(String[] args) throws IOException {
-        writeTest();
+        byte[] b = new byte[20];
+        ByteBuffer buffer = ByteBuffer.wrap(b);
+        System.out.println("capacity: "+buffer.capacity()+", position: "+buffer.position()+", limit: "+buffer.limit());
+        System.out.println(Integer.MAX_VALUE);
     }
 }

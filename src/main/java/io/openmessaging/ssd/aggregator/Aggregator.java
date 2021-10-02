@@ -94,6 +94,7 @@ public class Aggregator implements Runnable {
 
         @Override
         public void run() {
+            long t = System.nanoTime();
             // 并行 force index mmap
             forceExecutor.execute(() -> {
                 IndexHandle.getInstance().force();
@@ -115,10 +116,14 @@ public class Aggregator implements Runnable {
                 e.printStackTrace();
             }
 
+            System.out.println("4.force time: "+(System.nanoTime()-t));
+            t = System.nanoTime();
+
             // 通知put线程持久化完成
             for (MessagePutRequest req:flushBatch) {
                 req.countDown(System.nanoTime());
             }
+            System.out.println("5.countDown time: "+(System.nanoTime()-t));
         }
     }
 
@@ -141,7 +146,7 @@ public class Aggregator implements Runnable {
         long sOff = appendRes.getWriteStartOffset();
         MappedByteBuffer mmap = appendRes.getMmap();
 
-//        System.out.println("append time: "+(System.nanoTime()-t));
+//        System.out.println("1.append time: "+(System.nanoTime()-t));
         t = System.nanoTime();
 
         // 更新index
@@ -150,11 +155,11 @@ public class Aggregator implements Runnable {
             sOff += req.getMessage().getData().length;
         }
 
-//        System.out.println("new index time: "+(System.nanoTime()-t));
+//        System.out.println("2.new index time: "+(System.nanoTime()-t));
         t = System.nanoTime();
 
         executor.submit(new ForceTask(mmap, flushBatch));
 
-//        System.out.println("execute task time: "+(System.nanoTime()-t));
+//        System.out.println("3.execute task time: "+(System.nanoTime()-t));
     }
 }

@@ -29,7 +29,7 @@ public class SSDWriterReader5MMAP {
     // 记录到当前datafile的总偏移量，read时的精确定位文件
     private ArrayList<Long> accumulativePhyOffset = new ArrayList<>();
     // 记录所有datafile的偏移量之和, 计算当前的写入点
-    private AtomicLong finalPhyOffset = new AtomicLong(0);
+    private Long finalPhyOffset = 0L;
     // datafile保存的根目录
     private final String dataFileDir = MntPath.DATA_FILE_DIR;
     // 当前datafile的mmap
@@ -55,8 +55,8 @@ public class SSDWriterReader5MMAP {
             if (fileNames != null) {
                 for (int i = 0; i < fileNames.length; i++) {
                     RandomAccessFile file = new RandomAccessFile(dataFileDir+fileNames[i], "rw");
-                    finalPhyOffset.addAndGet(file.length());
-                    accumulativePhyOffset.add(finalPhyOffset.get());
+                    finalPhyOffset += file.length();
+                    accumulativePhyOffset.add(finalPhyOffset);
                     fileList.add(file);
                     // 获取最新文件的mmap
                     if (i == fileNames.length-1) {
@@ -111,7 +111,8 @@ public class SSDWriterReader5MMAP {
      * @return: 本次写入的起点和用于force的mmap对象*/
     public AppendRes2 append(byte[] data) {
         // 写入点
-        long writeStartOffset = finalPhyOffset.getAndAdd(data.length);
+        long writeStartOffset = finalPhyOffset;
+        finalPhyOffset += data.length;
         // listSize总是比accSize大一，因为acc只有当前datafile满的时候才会新增，而list在当前文件未满的时候就已经存在datafile的raf对象了
         int listSize = fileList.size();
         int accSize = accumulativePhyOffset.size();

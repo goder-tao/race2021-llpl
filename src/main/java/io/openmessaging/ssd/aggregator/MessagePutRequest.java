@@ -26,8 +26,8 @@ public class MessagePutRequest {
         try {
             long t = System.nanoTime();
             wait.await();
-//            System.out.println("receive countDown: "+(System.nanoTime()-downTime));
-//            System.out.println("await time: "+(System.nanoTime()-t));
+//            System.out.println("6.receive countDown: "+(System.nanoTime()-downTime));
+//            System.out.println("7.await time: "+(System.nanoTime()-t));
         } catch (Exception e) {
             e.printStackTrace();
         }
