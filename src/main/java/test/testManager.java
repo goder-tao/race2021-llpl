@@ -61,19 +61,28 @@ public class testManager {
 
         long t = System.nanoTime();
         for (int i = 0; i < threads.length; i++) {
-            threads[i] = new Thread(new WriterRunner(manager, i));
-            threads[i].start();
+            threads[i] = new Thread(new WriterRunner(manager, i, 100));
+//            threads[i].start();
         }
 
-        for (int i = 0; i < threads.length; i++) {
-            try {
-                threads[i].join();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+//        for (int i = 0; i < threads.length; i++) {
+//            try {
+//                threads[i].join();
+//            } catch (InterruptedException e) {
+//                e.printStackTrace();
+//            }
+//        }
+
+        try {
+            Thread.sleep(6000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
 
+        // 冷读
         testParallelRead(manager, "test0", 0, 0, 40, "test1", 0, 0, 150);
+        // 热读
+        testParallelRead(manager, "test2", 0, 10, 40, "test3", 0, 20, 50);
         System.out.println();
     }
 
@@ -81,15 +90,17 @@ public class testManager {
      * 专门顺序写的线程*/
     static class WriterRunner implements Runnable {
         int i;
+        int writeTimes;
         Manager manager;
-        public WriterRunner(Manager manager, int i) {
+        public WriterRunner(Manager manager, int i, int writeTimes) {
             this.i = i;
             this.manager = manager;
+            this.writeTimes = writeTimes;
         }
 
         @Override
         public void run() {
-            testSequentWrite(manager, "test"+i, 0, 0, 7000);
+            testSequentWrite(manager, "test"+i, 0, 0, writeTimes);
         }
     }
 
@@ -135,8 +146,6 @@ public class testManager {
 
     /**
      * 串行读数据
-     * 冷队列读(yes), range(0, 20)
-     * 热队列读(yes), range(10, 20)
      */
     static void testSequentRead(Manager manager, String topic, int qid, int s, int e) {
         Map<Integer, ByteBuffer> data = manager.getRange(topic, qid, s, e - s);
@@ -146,7 +155,6 @@ public class testManager {
             System.out.println(Thread.currentThread().getName() + "  " + key + ":" + b.getInt());
         }
         System.out.println("}");
-
     }
 
     /**
@@ -217,12 +225,12 @@ public class testManager {
         });
         thread1.start();
         thread2.start();
-        try {
-            thread1.join();
-            thread2.join();
-        } catch (Exception e) {
-            System.out.println(e.toString());
-        }
+//        try {
+//            thread1.join();
+//            thread2.join();
+//        } catch (Exception e) {
+//            System.out.println(e.toString());
+//        }
     }
 
 }

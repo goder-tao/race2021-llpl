@@ -116,14 +116,14 @@ public class Aggregator implements Runnable {
                 e.printStackTrace();
             }
 
-            System.out.println("4.force time: "+(System.nanoTime()-t));
+//            System.out.println("4.force time: "+(System.nanoTime()-t));
             t = System.nanoTime();
 
             // 通知put线程持久化完成
             for (MessagePutRequest req:flushBatch) {
                 req.countDown(System.nanoTime());
             }
-            System.out.println("5.countDown time: "+(System.nanoTime()-t));
+//            System.out.println("5.countDown time: "+(System.nanoTime()-t));
         }
     }
 

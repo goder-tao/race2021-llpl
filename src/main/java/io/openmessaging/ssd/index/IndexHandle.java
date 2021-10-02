@@ -154,5 +154,4 @@ public class IndexHandle {
     public static IndexHandle getInstance() {
         return instance;
     }
-
 }
