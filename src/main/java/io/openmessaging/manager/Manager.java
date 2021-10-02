@@ -264,7 +264,7 @@ public class Manager {
         if (i != fetchNum) {
             for(; i < fetchNum; i++) {
                 // 从indexhandle获取offset和size
-                ByteBuffer offAndSize =  indexHandle.getPhyOffsetAndSize((topic+queueId+(offset+i)).hashCode());
+                ByteBuffer offAndSize =  indexHandle.getPhyOffsetAndSize((topic+"#"+queueId+"#"+(offset+i)).hashCode());
                 if (offAndSize == null) continue;
                 offAndSize.rewind();
                 long off = offAndSize.getLong();
@@ -298,7 +298,7 @@ public class Manager {
                 MemoryNode handle = getOrNull(getOrNull(getOrNull(hotTopicQueueOffsetHandle, topic), queueId), offset + i);
                 if (handle == null) {  // aep 热空间无缓存，只能走磁盘
                     // 从indexhandle获取offset和size
-                    ByteBuffer offAndSize =  indexHandle.getPhyOffsetAndSize((topic+queueId+(offset+i)).hashCode());
+                    ByteBuffer offAndSize =  indexHandle.getPhyOffsetAndSize((topic+"#"+queueId+"#"+(offset+i)).hashCode());
                     if (offAndSize == null) continue;
                     offAndSize.rewind();
                     long off = offAndSize.getLong();
