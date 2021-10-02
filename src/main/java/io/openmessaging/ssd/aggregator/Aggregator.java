@@ -141,7 +141,7 @@ public class Aggregator implements Runnable {
         long sOff = appendRes.getWriteStartOffset();
         MappedByteBuffer mmap = appendRes.getMmap();
 
-        System.out.println("append time: "+(System.nanoTime()-t));
+//        System.out.println("append time: "+(System.nanoTime()-t));
         t = System.nanoTime();
 
         // 更新index
@@ -150,11 +150,11 @@ public class Aggregator implements Runnable {
             sOff += req.getMessage().getData().length;
         }
 
-        System.out.println("new index time: "+(System.nanoTime()-t));
+//        System.out.println("new index time: "+(System.nanoTime()-t));
         t = System.nanoTime();
 
         executor.submit(new ForceTask(mmap, flushBatch));
 
-        System.out.println("execute task time: "+(System.nanoTime()-t));
+//        System.out.println("execute task time: "+(System.nanoTime()-t));
     }
 }

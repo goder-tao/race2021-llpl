@@ -89,7 +89,7 @@ public class testManager {
 
         @Override
         public void run() {
-            testSequentWrite(manager, "test"+i, 0, 0, 50);
+            testSequentWrite(manager, "test"+i, 0, 0, 7000);
         }
     }
 

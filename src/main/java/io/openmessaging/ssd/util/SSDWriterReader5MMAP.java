@@ -91,7 +91,7 @@ public class SSDWriterReader5MMAP {
         int fileIndex = (int) (phyOffset/ StorageSize.GB)+1;
 
         // 精确定位，看读取的offset和对应datafile的累积offset之间的关系
-        if (accumulativePhyOffset.get(fileIndex) != null && accumulativePhyOffset.get(fileIndex) < phyOffset) {
+        if (accumulativePhyOffset.size() > fileIndex && accumulativePhyOffset.get(fileIndex) != null && accumulativePhyOffset.get(fileIndex) < phyOffset) {
             fileIndex++;
         }
 

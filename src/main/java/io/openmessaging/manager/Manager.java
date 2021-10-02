@@ -157,21 +157,21 @@ public class Manager {
             }
         }
 
-        if (pmemIOFlag != 0) {
-            long appendTime = pmemIOFlag - startFlag;
-            long mapTime = mapFlag - startFlag;
-            long pmemIOTime = pmemIOFlag - write2DiskFlag;
-            long writeDiskTime = write2DiskFlag - mapFlag;
-            sumAppendTime.addAndGet(appendTime);
-            sumMapTime.addAndGet(mapTime);
-            sumPMemIO.addAndGet(pmemIOTime);
-            sumDiskIO.addAndGet(writeDiskTime);
-            System.out.printf("Append spend time: %dns, map time: %dns, pmem io time: %dns, disk io time: %dns\n" +
-                            "Spend time - map time: %f%%, pmem io: %f%%, hdd io: %f%%\n\n",
-                    appendTime, mapTime, pmemIOTime, writeDiskTime,
-                    (double) sumMapTime.get() / sumAppendTime.get(), (double) sumPMemIO.get() / sumAppendTime.get(),
-                    (double) sumDiskIO.get() / sumAppendTime.get());
-        }
+//        if (pmemIOFlag != 0) {
+//            long appendTime = pmemIOFlag - startFlag;
+//            long mapTime = mapFlag - startFlag;
+//            long pmemIOTime = pmemIOFlag - write2DiskFlag;
+//            long writeDiskTime = write2DiskFlag - mapFlag;
+//            sumAppendTime.addAndGet(appendTime);
+//            sumMapTime.addAndGet(mapTime);
+//            sumPMemIO.addAndGet(pmemIOTime);
+//            sumDiskIO.addAndGet(writeDiskTime);
+//            System.out.printf("Append spend time: %dns, map time: %dns, pmem io time: %dns, disk io time: %dns\n" +
+//                            "Spend time - map time: %f%%, pmem io: %f%%, hdd io: %f%%\n\n",
+//                    appendTime, mapTime, pmemIOTime, writeDiskTime,
+//                    (double) sumMapTime.get() / sumAppendTime.get(), (double) sumPMemIO.get() / sumAppendTime.get(),
+//                    (double) sumDiskIO.get() / sumAppendTime.get());
+//        }
 
         return appendOffset;
     }
