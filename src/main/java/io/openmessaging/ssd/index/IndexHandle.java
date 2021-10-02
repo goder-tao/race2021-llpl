@@ -48,6 +48,11 @@ public class IndexHandle {
         // 获取到最新的一个位置
         int index = head.getAndAddCurrent();
 
+        if (index >= IndexField.INDEX_SUM) {
+            // 严重错误，Index的数量超出最大值
+            logger.fatal("index count out of range!!!!!!!!!!!!!!!!!!!!!");
+        }
+
         // 针对这个位置设置当前linked index的各个字段值
         int index_pos = IndexField.HEAD_SIZE + IndexField.SLOT_SUM*IndexField.SLOT_SIZE+IndexField.INDEX_SIZE*index;
 
@@ -139,6 +144,7 @@ public class IndexHandle {
 
         public int getAndAddCurrent() {
             int curr = currentIndex.getAndIncrement();
+
             this.mmapedIndex.putInt(8, curr+1);
             // 返回当前可用的index位置
             return curr;

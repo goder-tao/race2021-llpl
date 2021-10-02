@@ -10,11 +10,11 @@ public class IndexField {
     // 一个slot的大小
     public static int SLOT_SIZE = 4;
     // slot数量
-    public static int SLOT_SUM = 12500000;
+    public static int SLOT_SUM = 22500000;
     // 一个linked index的大小
     public static int INDEX_SIZE = 22;
     // index数量
-    public static int INDEX_SUM = 50000000;
+    public static int INDEX_SUM = 90000000;
     // 整个indexfile的大小
     public static int INDEX_FILE_SIZE = HEAD_SIZE+SLOT_SUM*SLOT_SIZE+INDEX_SUM*INDEX_SIZE;
 
