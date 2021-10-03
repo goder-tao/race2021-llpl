@@ -20,8 +20,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @date 2021-09-21*/
 public class IndexHandle {
     private Logger logger = LogManager.getLogger(IndexHandle.class.getName());
-    private MappedByteBuffer mmapedIndex = null;
-    private Head head;
+    private volatile MappedByteBuffer mmapedIndex = null;
+    private volatile Head head;
 
     private static IndexHandle instance = new IndexHandle(MntPath.INDEX_FILE_DIR);
 
@@ -83,16 +83,17 @@ public class IndexHandle {
         // 模拟一个虚拟节点，这个虚拟节点的preIndex是slot中存的index，方便组织遍历的形式
         int preIndex = slot_internal;
         // 开始遍历链表
-        do {
+        while (preIndex != 0) {
             index_pos = IndexField.HEAD_SIZE + IndexField.SLOT_SUM*IndexField.SLOT_SIZE+IndexField.INDEX_SIZE*preIndex;
-            mmapedIndex.position(index_pos+8);
-            mmapedIndex.get(b, 0, 10);
+            for (int i = 0; i < 10; i++) {
+                b[i] = mmapedIndex.get(index_pos+8+i);
+            }
             preIndex = mmapedIndex.getInt(index_pos+18);
             if (hashKey == mmapedIndex.getLong(index_pos)) {
                 find = true;
                 break;
             }
-        } while (preIndex != 0);
+        }
 
         // 不存在
         if (!find) {
@@ -100,7 +101,6 @@ public class IndexHandle {
         } else {
             return ByteBuffer.wrap(b);
         }
-
     }
 
     /**

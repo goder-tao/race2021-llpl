@@ -236,6 +236,8 @@ public class Manager {
         return space.write(data, tName);
     }
 
+//    int c = 0;
+
     /**
      * 获取冷队列的数据，并负责处理在disk的读情况
      * @param coldQueueNode - 冷队列的node，在确定了冷队列的前提下调用的方法
@@ -253,6 +255,9 @@ public class Manager {
             if (handle == null) {
                 break;
             }
+//            c++;
+//            System.out.println(c);
+
             // 从aep冷空间读取并移除消息
             data = coolBlock.readDataAndFree(handle);
             dataMap.put(i, data);
@@ -262,18 +267,18 @@ public class Manager {
 
         // 需要从ssd读
         if (i != fetchNum) {
+//            System.out.println("ssd");
             for(; i < fetchNum; i++) {
                 // 从indexhandle获取offset和size
-                ByteBuffer offAndSize =  indexHandle.getPhyOffsetAndSize((topic+"#"+queueId+"#"+(offset+i)).hashCode());
-                if (offAndSize == null) continue;
-                offAndSize.rewind();
-                long off = offAndSize.getLong();
-                short size = offAndSize.getShort();
-                data = ssdWriterReader.read(off, size);
+                data = ssdWriterReader.directRead((topic+"#"+queueId+"#"+(offset+i)).hashCode());
+                // 读取超过已经写入的范围，不再读取
+                if (data == null) {
+                    break;
+                }
                 dataMap.put(i, data);
             }
             // 重新调整调度器的起点
-            coldQueueNode.tailOffset.set(offset + fetchNum + 1);
+            coldQueueNode.tailOffset.set(offset + i);
         }
         // 冷队列信息节点加入队列head, 刚刚被消费过的队列增加调度的机会
         return dataMap;
@@ -298,12 +303,11 @@ public class Manager {
                 MemoryNode handle = getOrNull(getOrNull(getOrNull(hotTopicQueueOffsetHandle, topic), queueId), offset + i);
                 if (handle == null) {  // aep 热空间无缓存，只能走磁盘
                     // 从indexhandle获取offset和size
-                    ByteBuffer offAndSize =  indexHandle.getPhyOffsetAndSize((topic+"#"+queueId+"#"+(offset+i)).hashCode());
-                    if (offAndSize == null) continue;
-                    offAndSize.rewind();
-                    long off = offAndSize.getLong();
-                    short size = offAndSize.getShort();
-                    data = ssdWriterReader.read(off, size);
+                    data = ssdWriterReader.directRead((topic+"#"+queueId+"#"+(offset+i)).hashCode());
+                    // 读取超过已经写入的范围，不再读取
+                    if (data == null) {
+                        break;
+                    }
                 } else {
                     data = hotBlock.readDataAndFree(handle);
                 }
