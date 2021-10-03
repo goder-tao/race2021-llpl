@@ -15,7 +15,6 @@ import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * 每次重新打开一个使用mmap写
@@ -98,8 +97,11 @@ public class SSDWriterReader5MMAP {
         off = (int) (phyOffset - accumulativePhyOffset.get(fileIndex-1));
 
         try {
-            fileList.get(fileIndex).seek(off);
-            fileList.get(fileIndex).read(b, 0, b.length);
+            String fileName = PartitionMaker.makePartitionPath(fileIndex, 5, 1)+".data";
+            RandomAccessFile raf = new RandomAccessFile(dataFileDir+"/"+fileName, "r");
+            raf.seek(off);
+            raf.read(b, 0, b.length);
+            raf.close();
         } catch (Exception e) {
             logger.error("fileList get fail, "+e.toString());
         }

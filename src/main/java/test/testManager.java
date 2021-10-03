@@ -79,7 +79,7 @@ public class testManager {
 //        }
 
         // 冷读
-//        testParallelRead(manager, "test0", 0, 0, 40, "test1", 0, 0, 150);
+        testParallelRead(manager, "test0", 0, 0, 40, "test1", 0, 0, 150);
         // 热读
         testParallelRead(manager, "test2", 0, 10, 20, "test3", 0, 20, 50);
 
