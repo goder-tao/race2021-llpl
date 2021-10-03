@@ -269,10 +269,28 @@ public class test {
         System.out.println("total time: "+(System.nanoTime()-t));
     }
 
+    // 测试每次读取文件不关闭和关闭在效率上的差距
+    // close each time -> 9k-1W
+    // no close -> 4700
+    static void testFileReadWithNoClose() {
+        RandomAccessFile raf;
+        int writeTimes = 100000;
+        int writeSize = 8192;
+        long t = System.nanoTime();
+        try {
+            raf = new RandomAccessFile(MntPath.SSD_PATH+"data/00001.data", "r");
+            for (int i = 0; i < writeTimes; i++) {
+
+                raf.seek(i*writeSize);
+                raf.read(new byte[writeSize], 0, writeSize);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        System.out.println("average time: "+(System.nanoTime()-t)/writeTimes);
+    }
+
     public static void main(String[] args) throws IOException {
-        byte[] b = new byte[20];
-        ByteBuffer buffer = ByteBuffer.wrap(b);
-        System.out.println("capacity: "+buffer.capacity()+", position: "+buffer.position()+", limit: "+buffer.limit());
-        System.out.println(Integer.MAX_VALUE);
+        testFileReadWithNoClose();
     }
 }
