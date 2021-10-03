@@ -151,7 +151,7 @@ public class Aggregator implements Runnable {
 
         // 更新index
         for (MessagePutRequest req:flushBatch) {
-            indexHandle.newIndex(flushBatch.peek().getMessage().getHashKey(), sOff, (short) req.getMessage().getData().length);
+            indexHandle.newIndex(req.getMessage().getHashKey(), sOff, (short) req.getMessage().getData().length);
             sOff += req.getMessage().getData().length;
         }
 

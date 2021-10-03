@@ -23,7 +23,6 @@ public class testManager {
      *      strategy: 40MB的pmem空间, 写入50MB*/
     static void testScheduler() {
         Manager manager = new Manager();
-
         Thread thread = new Thread(new Runnable() {
             @Override
             public void run() {
@@ -34,13 +33,13 @@ public class testManager {
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
-                testSequentRead(manager, "test", 0, 3201, 4800);
+                testSequentRead(manager, "test", 0, 3200, 4800);
                 try {
                     Thread.sleep(1000);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
-                testSequentRead(manager, "test", 0, 4801, 6400);
+                testSequentRead(manager, "test", 0, 4800, 6400);
             }
         });
 
@@ -62,27 +61,28 @@ public class testManager {
         long t = System.nanoTime();
         for (int i = 0; i < threads.length; i++) {
             threads[i] = new Thread(new WriterRunner(manager, i, 100));
-//            threads[i].start();
+            threads[i].start();
         }
 
-//        for (int i = 0; i < threads.length; i++) {
-//            try {
-//                threads[i].join();
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
+        for (int i = 0; i < threads.length; i++) {
+            try {
+                threads[i].join();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+
+//        try {
+//            Thread.sleep(6000);
+//        } catch (InterruptedException e) {
+//            e.printStackTrace();
 //        }
 
-        try {
-            Thread.sleep(6000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-
         // 冷读
-        testParallelRead(manager, "test0", 0, 0, 40, "test1", 0, 0, 150);
+//        testParallelRead(manager, "test0", 0, 0, 40, "test1", 0, 0, 150);
         // 热读
-        testParallelRead(manager, "test2", 0, 10, 40, "test3", 0, 20, 50);
+        testParallelRead(manager, "test2", 0, 10, 20, "test3", 0, 20, 50);
+
         System.out.println();
     }
 
@@ -164,7 +164,7 @@ public class testManager {
         Random random = new Random();
         for (int i = s; i < e; i++) {
             int r = 100 + random.nextInt(17000);
-            ByteBuffer data = ByteBuffer.allocate(8192);
+            ByteBuffer data = ByteBuffer.allocate(r);
             data.putInt(i);
             manager.append(topic, qid, data);
         }
