@@ -28,13 +28,13 @@ public class SSDWriterReader5MMAP {
     // 记录到当前datafile的总偏移量，read时的精确定位文件
     private ArrayList<Long> accumulativePhyOffset = new ArrayList<>();
     // 记录所有datafile的偏移量之和, 计算当前的写入点
-    private Long finalPhyOffset = 0L;
+    private long finalPhyOffset = 0L;
     // datafile保存的根目录
     private final String dataFileDir = MntPath.DATA_FILE_DIR;
     // 当前datafile的mmap
     private  MappedByteBuffer mmap;
 
-    private static final Logger logger = LogManager.getLogger(SSDWriterReader5.class.getName());
+    private final Logger logger;
 
     private SSDWriterReader5MMAP() {
         File dir = new File(dataFileDir);
@@ -46,6 +46,7 @@ public class SSDWriterReader5MMAP {
         if (fileNames != null) {
             Arrays.sort(fileNames);
         }
+        logger = LogManager.getLogger(SSDWriterReader5.class.getName());
         // 构造list
         try {
             // 模拟第0个文件，大小为0，使得List的index逻辑上和文件的排序相同，比如index-1对应第一个文件
@@ -123,6 +124,9 @@ public class SSDWriterReader5MMAP {
         try {
             // 当前上写入点+写入的长度-上一个文件的累积offset，计算当前文件的大小，超出默认的一个data partition的大小，新建一个分区
             if (listSize == 1 || (writeStartOffset-accumulativePhyOffset.get(accSize-1))+data.length > StorageSize.GB) {
+
+                System.out.println("list size: "+listSize);
+
                 if (listSize != 1) {
                     // 记录上一个datafile的累计phyOffset
                     accumulativePhyOffset.add(writeStartOffset);
@@ -153,7 +157,7 @@ public class SSDWriterReader5MMAP {
     }
 
     public void printInfo() {
-        System.out.println("final off: "+finalPhyOffset/StorageSize.GB+", list size: "+fileList.size()+", acc size: "+accumulativePhyOffset.size());
+        System.out.println("final off: "+(float)finalPhyOffset/StorageSize.GB+", list size: "+fileList.size()+", acc size: "+accumulativePhyOffset.size());
     }
 
     public static SSDWriterReader5MMAP getInstance() {

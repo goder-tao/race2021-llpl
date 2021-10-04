@@ -19,13 +19,14 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @author tao
  * @date 2021-09-21*/
 public class IndexHandle {
-    private Logger logger = LogManager.getLogger(IndexHandle.class.getName());
+    private final Logger logger;
     private volatile MappedByteBuffer mmapedIndex = null;
     private volatile Head head;
 
     private static IndexHandle instance = new IndexHandle(MntPath.INDEX_FILE_DIR);
 
     private IndexHandle(String indexFileDir) {
+        logger = LogManager.getLogger(IndexHandle.class.getName());
         try {
             File dir = new File(indexFileDir);
             if (!dir.exists()) {

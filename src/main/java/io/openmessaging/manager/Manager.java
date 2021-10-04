@@ -54,8 +54,12 @@ public class Manager {
     // 阶段标记
     private AtomicBoolean isStageChanged = new AtomicBoolean(false);
     private final Logger logger = LogManager.getLogger(Manager.class.getName());
+
+    // 临时变量
     // 阶段时间s
     private long createTime;
+    // 记录写入的数据大小
+    private AtomicLong totalData = new AtomicLong(0);
 
     public Manager() {
         coolBlock = new PMemSpace2(MntPath.AEP_PATH + "cold", StorageSize.COLD_SPACE_SIZE);
@@ -75,6 +79,8 @@ public class Manager {
      * 写方法
      */
     public long append(String topic, int queueId, ByteBuffer data) {
+        totalData.addAndGet(data.capacity());
+
         long startFlag = System.nanoTime();
         long pmemIOFlag = 0, mapFlag, write2DiskFlag;
 
@@ -98,7 +104,7 @@ public class Manager {
         Message4Flush message4Flush = new Message4Flush(data.array(), hashKey);
         MessagePutRequest request = new MessagePutRequest(message4Flush);
 
-        //
+        // 将request送入aggregator进行聚合
         aggregator.putMessageRequest(request);
         request.getResponse();
 
@@ -190,6 +196,7 @@ public class Manager {
             Thread schedulerThread = new Thread(scheduler);
             schedulerThread.start();
             logger.info("stage one spend time: "+(System.nanoTime()-createTime)+"ns");
+            logger.info("manager record total data: "+totalData.get());
             ssdWriterReader.printInfo();
         }
 
@@ -238,8 +245,6 @@ public class Manager {
         return space.write(data, tName);
     }
 
-//    int c = 0;
-
     /**
      * 获取冷队列的数据，并负责处理在disk的读情况
      * @param coldQueueNode - 冷队列的node，在确定了冷队列的前提下调用的方法
@@ -257,8 +262,6 @@ public class Manager {
             if (handle == null) {
                 break;
             }
-//            c++;
-//            System.out.println(c);
 
             // 从aep冷空间读取并移除消息
             data = coolBlock.readDataAndFree(handle);

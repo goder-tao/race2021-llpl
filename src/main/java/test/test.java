@@ -2,6 +2,7 @@ package test;
 
 import io.openmessaging.constant.MntPath;
 import io.openmessaging.constant.StorageSize;
+import io.openmessaging.scheduler.PriorityNode;
 
 import java.io.File;
 import java.io.IOException;
@@ -9,7 +10,10 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.ArrayList;
 import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class test {
@@ -290,10 +294,19 @@ public class test {
         System.out.println("average time: "+(System.nanoTime()-t)/writeTimes);
     }
 
+    static class Node {
+        int i;
+        Node(int i) {
+            this.i = i;
+        }
+    }
+
     public static void main(String[] args) throws IOException {
-        System.out.print("111");
-        System.out.print("333");
-        System.out.println();
-        System.out.print("222");
+        ConcurrentLinkedQueue<Node> queue = new ConcurrentLinkedQueue<>();
+        Node node = new Node(1);
+        queue.offer(node);
+        queue.offer(node);
+        queue.offer(node);
+        System.out.println(queue.size());
     }
 }

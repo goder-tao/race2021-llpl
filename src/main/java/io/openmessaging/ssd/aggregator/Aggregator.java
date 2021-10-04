@@ -68,8 +68,10 @@ public class Aggregator implements Runnable {
             try {
                 // 尝试获取信号量并等待一个比较长的时间，用来处理最后一条消息
                 if (!waitPoint.tryAcquire(200, TimeUnit.MILLISECONDS)) {
-                    flushBatchQueue.offer(batch);
-                    batch = new Batch();
+                    if (!batch.isEmpty()) {
+                        flushBatchQueue.offer(batch);
+                        batch = new Batch();
+                    }
                 }
                 doFlush();
             } catch (Exception e) {
