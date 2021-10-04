@@ -58,10 +58,9 @@ public class testManager {
 
         Thread[] threads = new Thread[20];
 
-        long t = System.nanoTime();
         for (int i = 0; i < threads.length; i++) {
             threads[i] = new Thread(new WriterRunner(manager, i, 100));
-            threads[i].start();
+//            threads[i].start();
         }
 
         for (int i = 0; i < threads.length; i++) {
@@ -72,16 +71,35 @@ public class testManager {
             }
         }
 
-//        try {
-//            Thread.sleep(6000);
-//        } catch (InterruptedException e) {
-//            e.printStackTrace();
+        // 冷读
+        testParallelRead(manager, "test0", 0, 0, 10, "test1", 0, 0, 15);
+        // 热读
+        testParallelRead(manager, "test2", 0, 10, 20, "test3", 0, 20, 25);
+
+        // 再次写入
+        for (int i = 0; i < 4; i++) {
+            threads[i] = new Thread(new WriterRunner(manager, i, 100));
+//            threads[i].start();
+        }
+
+//        for (int i = 0; i < threads.length; i++) {
+//            try {
+//                threads[i].join();
+//            } catch (InterruptedException e) {
+//                e.printStackTrace();
+//            }
 //        }
 
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
         // 冷读
-        testParallelRead(manager, "test0", 0, 0, 40, "test1", 0, 0, 150);
+        testParallelRead(manager, "test0", 0, 25, 40, "test1", 0, 30, 50);
         // 热读
-        testParallelRead(manager, "test2", 0, 10, 20, "test3", 0, 20, 50);
+        testParallelRead(manager, "test2", 0, 70, 110, "test3", 0, 140, 160);
 
         System.out.println();
     }
