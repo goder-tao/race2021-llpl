@@ -1,14 +1,11 @@
 package io.openmessaging.ssd.aggregator;
 
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 
 /**
- * 传入Aggregator，向外暴露future task，接收返回的结果
- *
+ * 传入Aggregator，使用CountDown等待异步刷盘结束，接收返回的结果
  * @author tao */
 public class MessagePutRequest {
-    private CompletableFuture<Integer> future;
     private CountDownLatch wait;
     private Message4Flush message;
 

@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 
 public class DRAMCache {
-    private final Logger logger = LogManager.getLogger(DRAMCache.class.getName());
+    private final Logger logger;
     // 定时监视内存情况
     private Thread updateAvailableMemory;
     // key为topic+qid组合
@@ -31,7 +31,7 @@ public class DRAMCache {
 
     public DRAMCache() {
         currentMemory = SystemMemory.getSystemAvailableMemory();
-
+        logger = LogManager.getLogger(DRAMCache.class.getName());
     }
 
     public void startDetect() {
