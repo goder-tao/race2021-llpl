@@ -12,6 +12,7 @@ import io.openmessaging.ssd.aggregator.Message4Flush;
 import io.openmessaging.ssd.aggregator.MessagePutRequest;
 import io.openmessaging.ssd.index.IndexHandle;
 import io.openmessaging.ssd.util.SSDWriterReader5MMAP;
+import io.openmessaging.util.ByteBufferUtil;
 import io.openmessaging.util.MapUtil;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
@@ -79,7 +80,7 @@ public class Manager {
      * 写方法
      */
     public long append(String topic, int queueId, ByteBuffer data) {
-        totalData.addAndGet(data.capacity());
+        totalData.addAndGet(data.remaining());
 
         long startFlag = System.nanoTime();
         long pmemIOFlag = 0, mapFlag, write2DiskFlag;
@@ -95,13 +96,11 @@ public class Manager {
 
         mapFlag = System.nanoTime();
 
-        assert data.limit() == data.capacity();
-
-//        ByteBuffer b1 = ByteBufferUtil.copyFrom(data);
+        ByteBuffer b1 = ByteBufferUtil.copyFrom(data);
 
         // 生成MessageRequest
         int hashKey = (topic+"#"+queueId+"#"+appendOffset).hashCode();
-        Message4Flush message4Flush = new Message4Flush(data.array(), hashKey);
+        Message4Flush message4Flush = new Message4Flush(b1.array(), hashKey);
         MessagePutRequest request = new MessagePutRequest(message4Flush);
 
         // 将request送入aggregator进行聚合
@@ -117,7 +116,7 @@ public class Manager {
         // 分阶段
         if (!isStageChanged.get()) {  // 第一阶段
             // 尝试写aep
-            MemoryNode memoryNode = writePMemOnly(coolBlock, data.array(), tName);
+            MemoryNode memoryNode = writePMemOnly(coolBlock, b1.array(), tName);
 
             pmemIOFlag = System.nanoTime();
 
@@ -138,7 +137,7 @@ public class Manager {
                     }
                 }
                 // 更新队列信息
-                node.queueDataSize.addAndGet(data.capacity());
+                node.queueDataSize.addAndGet(b1.capacity());
                 // 更新下一个不在aep中的offset， 当前offset已经加入到aep中
                 if (appendOffset + 1 > node.tailOffset.get()) {
                     node.tailOffset.set(appendOffset + 1);
@@ -148,10 +147,10 @@ public class Manager {
             // 冷热队列判断, 不再有新的队列加入进来, 热队列会被删掉, 根据null值判队列冷热
             if (node == null) {  // 热队列
                 if (dramCache != null && dramCache.isCacheAvailable()) {  // 缓存在dram
-                    dramCache.put(topic + queueId, appendOffset, data);
+                    dramCache.put(topic + queueId, appendOffset, b1);
                 } else {  // 缓存在aep
 
-                    MemoryNode memoryNode = writePMemOnly(hotBlock, data.array(), tName);
+                    MemoryNode memoryNode = writePMemOnly(hotBlock, b1.array(), tName);
                     pmemIOFlag = System.nanoTime();
 
                     // 写入aep成功

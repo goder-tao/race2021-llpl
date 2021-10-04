@@ -302,11 +302,7 @@ public class test {
     }
 
     public static void main(String[] args) throws IOException {
-        ConcurrentLinkedQueue<Node> queue = new ConcurrentLinkedQueue<>();
-        Node node = new Node(1);
-        queue.offer(node);
-        queue.offer(node);
-        queue.offer(node);
-        System.out.println(queue.size());
+        assert 5 == 5 : "2222";
+        System.out.println("111");
     }
 }
