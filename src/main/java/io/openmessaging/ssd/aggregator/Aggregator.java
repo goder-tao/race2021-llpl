@@ -27,9 +27,9 @@ public class Aggregator implements Runnable {
 
     private final Logger logger = LogManager.getLogger(Aggregator.class.getName());
     // 线程池、异步force
-    private final ExecutorService executor = Executors.newFixedThreadPool(20);
+    private final ExecutorService executor = Executors.newFixedThreadPool(15);
     // 并行index force线程池
-    private final ExecutorService forceExecutor = Executors.newFixedThreadPool(20);
+    private final ExecutorService forceExecutor = Executors.newFixedThreadPool(15);
     // 使用一个信号量进行唤醒
     private final Semaphore waitPoint = new Semaphore(0);
 
