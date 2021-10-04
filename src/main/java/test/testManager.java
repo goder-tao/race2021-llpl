@@ -60,7 +60,7 @@ public class testManager {
 
         for (int i = 0; i < threads.length; i++) {
             threads[i] = new Thread(new WriterRunner(manager, i, 100));
-            threads[i].start();
+//            threads[i].start();
         }
 
         for (int i = 0; i < threads.length; i++) {
