@@ -16,6 +16,6 @@ public class ByteBufferUtil {
         ByteBuffer buffer = ByteBuffer.allocate(Integer.BYTES);
         buffer.putInt(4);
         ByteBuffer b = copyFrom(buffer);
-        System.out.println(b.getInt());
+        System.out.println(b.capacity());
     }
 }

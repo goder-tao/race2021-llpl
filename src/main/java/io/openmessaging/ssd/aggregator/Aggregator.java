@@ -27,9 +27,9 @@ public class Aggregator implements Runnable {
 
     private final Logger logger = LogManager.getLogger(Aggregator.class.getName());
     // 线程池、异步force
-    private final ExecutorService executor = Executors.newFixedThreadPool(10);
+    private final ExecutorService executor = Executors.newFixedThreadPool(20);
     // 并行index force线程池
-    private final ExecutorService forceExecutor = Executors.newFixedThreadPool(10);
+    private final ExecutorService forceExecutor = Executors.newFixedThreadPool(20);
     // 使用一个信号量进行唤醒
     private final Semaphore waitPoint = new Semaphore(0);
 
@@ -116,14 +116,14 @@ public class Aggregator implements Runnable {
                 e.printStackTrace();
             }
 
-//            System.out.println("4.force time: "+(System.nanoTime()-t));
+//            System.out.println("3.force time: "+(System.nanoTime()-t));
             t = System.nanoTime();
 
             // 通知put线程持久化完成
             for (MessagePutRequest req:flushBatch) {
                 req.countDown(System.nanoTime());
             }
-//            System.out.println("5.countDown time: "+(System.nanoTime()-t));
+//            System.out.println("4.countDown time: "+(System.nanoTime()-t));
         }
     }
 
@@ -156,10 +156,7 @@ public class Aggregator implements Runnable {
         }
 
 //        System.out.println("2.new index time: "+(System.nanoTime()-t));
-        t = System.nanoTime();
 
         executor.submit(new ForceTask(mmap, flushBatch));
-
-//        System.out.println("3.execute task time: "+(System.nanoTime()-t));
     }
 }

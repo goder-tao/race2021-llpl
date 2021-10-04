@@ -291,6 +291,9 @@ public class test {
     }
 
     public static void main(String[] args) throws IOException {
-        testFileReadWithNoClose();
+        System.out.print("111");
+        System.out.print("333");
+        System.out.println();
+        System.out.print("222");
     }
 }
