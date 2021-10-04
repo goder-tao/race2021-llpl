@@ -189,6 +189,7 @@ public class Manager {
             Thread schedulerThread = new Thread(scheduler);
             schedulerThread.start();
             logger.info("stage one spend time: "+(System.nanoTime()-createTime)+"ns");
+            ssdWriterReader.printInfo();
         }
 
         // 返回结果

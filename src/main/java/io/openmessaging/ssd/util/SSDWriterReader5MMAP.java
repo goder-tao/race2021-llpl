@@ -119,7 +119,6 @@ public class SSDWriterReader5MMAP {
         int listSize = fileList.size();
         int accSize = accumulativePhyOffset.size();
         RandomAccessFile raf = null;
-
         try {
             // 当前上写入点+写入的长度-上一个文件的累积offset，计算当前文件的大小，超出默认的一个data partition的大小，新建一个分区
             if (listSize == 1 || (writeStartOffset-accumulativePhyOffset.get(accSize-1))+data.length > StorageSize.GB) {
@@ -151,6 +150,10 @@ public class SSDWriterReader5MMAP {
         }
 
         return new AppendRes2(mmap, writeStartOffset);
+    }
+
+    public void printInfo() {
+        System.out.println("final off: "+finalPhyOffset/StorageSize.GB+", list size: "+fileList.size()+", acc size: "+accumulativePhyOffset.size());
     }
 
     public static SSDWriterReader5MMAP getInstance() {
