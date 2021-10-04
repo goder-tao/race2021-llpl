@@ -17,12 +17,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 
 /**
- * 每次重新打开一个使用mmap写
+ * 打开文件的mmap写
  * @author tao
  * @date 2021-09-30*/
 public class SSDWriterReader5MMAP {
     // 单例
-    private static SSDWriterReader5MMAP instance = new SSDWriterReader5MMAP();
+    private static final SSDWriterReader5MMAP instance = new SSDWriterReader5MMAP();
     // 用一个list保存按创建顺序添加的文件raf对象，留给read复用
     private ArrayList<RandomAccessFile> fileList = new ArrayList<>();
     // 记录到当前datafile的总偏移量，read时的精确定位文件
@@ -53,6 +53,7 @@ public class SSDWriterReader5MMAP {
             fileList.add(null);
             if (fileNames != null) {
                 for (int i = 0; i < fileNames.length; i++) {
+                    logger.info("open file "+fileNames[i]);
                     RandomAccessFile file = new RandomAccessFile(dataFileDir+fileNames[i], "rw");
                     finalPhyOffset += file.length();
                     accumulativePhyOffset.add(finalPhyOffset);
@@ -148,7 +149,6 @@ public class SSDWriterReader5MMAP {
         } catch (IOException e) {
             logger.error("try to get file length fail, "+e.toString());
         }
-
         return new AppendRes2(mmap, writeStartOffset);
     }
 

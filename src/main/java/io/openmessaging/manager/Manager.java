@@ -12,7 +12,6 @@ import io.openmessaging.ssd.aggregator.Message4Flush;
 import io.openmessaging.ssd.aggregator.MessagePutRequest;
 import io.openmessaging.ssd.index.IndexHandle;
 import io.openmessaging.ssd.util.SSDWriterReader5MMAP;
-import io.openmessaging.util.ByteBufferUtil;
 import io.openmessaging.util.MapUtil;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
@@ -90,11 +89,13 @@ public class Manager {
 
         mapFlag = System.nanoTime();
 
-        ByteBuffer b1 = ByteBufferUtil.copyFrom(data);
+        assert data.limit() == data.capacity();
+
+//        ByteBuffer b1 = ByteBufferUtil.copyFrom(data);
 
         // 生成MessageRequest
         int hashKey = (topic+"#"+queueId+"#"+appendOffset).hashCode();
-        Message4Flush message4Flush = new Message4Flush(b1.array(), hashKey);
+        Message4Flush message4Flush = new Message4Flush(data.array(), hashKey);
         MessagePutRequest request = new MessagePutRequest(message4Flush);
 
         //
@@ -110,7 +111,7 @@ public class Manager {
         // 分阶段
         if (!isStageChanged.get()) {  // 第一阶段
             // 尝试写aep
-            MemoryNode memoryNode = writePMemOnly(coolBlock, b1.array(), tName);
+            MemoryNode memoryNode = writePMemOnly(coolBlock, data.array(), tName);
 
             pmemIOFlag = System.nanoTime();
 
@@ -144,7 +145,7 @@ public class Manager {
                     dramCache.put(topic + queueId, appendOffset, data);
                 } else {  // 缓存在aep
 
-                    MemoryNode memoryNode = writePMemOnly(hotBlock, b1.array(), tName);
+                    MemoryNode memoryNode = writePMemOnly(hotBlock, data.array(), tName);
                     pmemIOFlag = System.nanoTime();
 
                     // 写入aep成功
