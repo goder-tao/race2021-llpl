@@ -5,7 +5,6 @@ import io.openmessaging.constant.MntPath;
 import io.openmessaging.constant.StorageSize;
 import io.openmessaging.dramcache.DRAMCache;
 import io.openmessaging.manager.Manager;
-import io.openmessaging.ssd.util.SSDWriterReader5MMAP;
 import io.openmessaging.util.SystemMemory;
 
 import java.nio.ByteBuffer;
@@ -57,7 +56,7 @@ public class testManager {
     static void testParallel() {
         Manager manager = new Manager();
 
-        Thread[] threads = new Thread[20];
+        Thread[] threads = new Thread[1];
 
         for (int i = 0; i < threads.length; i++) {
             threads[i] = new Thread(new WriterRunner(manager, i, 100));
@@ -73,9 +72,9 @@ public class testManager {
         }
 
         // 冷读
-        testParallelRead(manager, "test0", 0, 0, 10, "test1", 0, 0, 15);
-        // 热读
-        testParallelRead(manager, "test2", 0, 10, 20, "test3", 0, 20, 25);
+//        testParallelRead(manager, "test0", 0, 0, 10, "test1", 0, 0, 15);
+//        // 热读
+//        testParallelRead(manager, "test2", 0, 10, 20, "test3", 0, 20, 25);
 
 //        // 再次写入
 //        for (int i = 0; i < 4; i++) {
@@ -90,10 +89,10 @@ public class testManager {
 //            e.printStackTrace();
 //        }
 //
-//        // 冷读
-//        testParallelRead(manager, "test0", 0, 25, 40, "test1", 0, 30, 50);
-//        // 热读
-//        testParallelRead(manager, "test2", 0, 70, 110, "test3", 0, 140, 160);
+        // 冷读
+        testParallelRead(manager, "test0", 0, 25, 40, "test1", 0, 30, 50);
+        // 热读
+        testParallelRead(manager, "test2", 0, 70, 110, "test3", 0, 140, 160);
 
         System.out.println();
     }
@@ -176,7 +175,7 @@ public class testManager {
         Random random = new Random();
         for (int i = s; i < e; i++) {
             int r = 100 + random.nextInt(17000);
-            ByteBuffer data = ByteBuffer.allocate(17408);
+            ByteBuffer data = ByteBuffer.allocate(100);
             data.putInt(i);
             manager.append(topic, qid, data);
         }

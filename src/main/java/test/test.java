@@ -3,6 +3,7 @@ package test;
 import io.openmessaging.constant.MntPath;
 import io.openmessaging.constant.StorageSize;
 import io.openmessaging.scheduler.PriorityNode;
+import io.openmessaging.ssd.aggregator.Batch;
 
 import java.io.File;
 import java.io.IOException;
@@ -11,6 +12,7 @@ import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -284,7 +286,6 @@ public class test {
         try {
             raf = new RandomAccessFile(MntPath.SSD_PATH+"data/00001.data", "r");
             for (int i = 0; i < writeTimes; i++) {
-
                 raf.seek(i*writeSize);
                 raf.read(new byte[writeSize], 0, writeSize);
             }
@@ -294,15 +295,10 @@ public class test {
         System.out.println("average time: "+(System.nanoTime()-t)/writeTimes);
     }
 
-    static class Node {
-        int i;
-        Node(int i) {
-            this.i = i;
-        }
-    }
-
     public static void main(String[] args) throws IOException {
-        assert 5 == 5 : "2222";
-        System.out.println("111");
+        ConcurrentLinkedQueue<Batch> queue = new ConcurrentLinkedQueue<>();
+        Batch batch = new Batch();
+        queue.offer(batch);
+
     }
 }

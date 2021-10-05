@@ -3,12 +3,14 @@ package io.openmessaging.ssd.aggregator;
 import io.openmessaging.ssd.index.IndexHandle;
 import io.openmessaging.ssd.util.AppendRes2;
 import io.openmessaging.ssd.util.SSDWriterReader5MMAP;
+import io.openmessaging.util.TimeCounter;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 向上聚合多个thread的数据，默认8kb聚合，向下调用底层disk写接口写入一批数据
@@ -32,6 +34,7 @@ public class Aggregator implements Runnable {
     private final ExecutorService forceExecutor = Executors.newFixedThreadPool(10);
     // 使用一个信号量进行唤醒
     private final Semaphore waitPoint = new Semaphore(0);
+    private AtomicBoolean hasNewed = new AtomicBoolean(false);
 
     public Aggregator(IndexHandle indexHandle) {
         this.indexHandle = indexHandle;
@@ -43,17 +46,24 @@ public class Aggregator implements Runnable {
      * queue，并新建一个batch添加当前req
      * */
     public synchronized void putMessageRequest(MessagePutRequest req) {
+        long t = System.nanoTime();
         // 当前batch已经满了，需要进行刷盘
         if (!this.batch.tryToAdd(req)) {
-            flushBatchQueue.offer(batch);
-            batch = new Batch();
+            if (hasNewed.compareAndSet(false, true)) {
+                flushBatchQueue.offer(batch);
+                batch = new Batch();
+            }
             waitPoint.release();
             batch.tryToAdd(req);
         } else if (batch.isCanFlush()) {
-            flushBatchQueue.offer(batch);
-            batch = new Batch();
+            if (hasNewed.compareAndSet(false, true)) {
+                flushBatchQueue.offer(batch);
+                batch = new Batch();
+            }
             waitPoint.release();
         }
+        hasNewed.set(false);
+        TimeCounter.getAggregatorInstance().addTime("request enqueue time", (int) (System.nanoTime()-t));
     }
 
     /**
@@ -69,8 +79,11 @@ public class Aggregator implements Runnable {
                 // 尝试获取信号量并等待一个比较长的时间，用来处理最后一条消息
                 if (!waitPoint.tryAcquire(200, TimeUnit.MILLISECONDS)) {
                     if (!batch.isEmpty()) {
-                        flushBatchQueue.offer(batch);
-                        batch = new Batch();
+                        if (hasNewed.compareAndSet(false, true)) {
+                            flushBatchQueue.offer(batch);
+                            batch = new Batch();
+                        }
+                        hasNewed.set(false);
                     }
                 }
                 doFlush();
@@ -118,14 +131,14 @@ public class Aggregator implements Runnable {
                 e.printStackTrace();
             }
 
-//            System.out.println("3.force time: "+(System.nanoTime()-t));
+            TimeCounter.getAggregatorInstance().addTime("force time", (int) (System.nanoTime()-t));
             t = System.nanoTime();
 
             // 通知put线程持久化完成
             for (MessagePutRequest req:flushBatch) {
                 req.countDown(System.nanoTime());
             }
-//            System.out.println("4.countDown time: "+(System.nanoTime()-t));
+            TimeCounter.getAggregatorInstance().addTime("count down time", (int) (System.nanoTime()-t));
         }
     }
 
@@ -148,7 +161,7 @@ public class Aggregator implements Runnable {
         long sOff = appendRes.getWriteStartOffset();
         MappedByteBuffer mmap = appendRes.getMmap();
 
-//        System.out.println("1.append time: "+(System.nanoTime()-t));
+        TimeCounter.getAggregatorInstance().addTime("append time", (int) (System.nanoTime()-t));
         t = System.nanoTime();
 
         // 更新index
@@ -157,7 +170,7 @@ public class Aggregator implements Runnable {
             sOff += req.getMessage().getData().length;
         }
 
-//        System.out.println("2.new index time: "+(System.nanoTime()-t));
+        TimeCounter.getAggregatorInstance().addTime("new index time", (int) (System.nanoTime()-t));
 
         executor.submit(new ForceTask(mmap, flushBatch));
     }

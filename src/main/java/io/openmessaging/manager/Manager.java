@@ -14,10 +14,12 @@ import io.openmessaging.ssd.index.IndexHandle;
 import io.openmessaging.ssd.util.SSDWriterReader5MMAP;
 import io.openmessaging.util.ByteBufferUtil;
 import io.openmessaging.util.MapUtil;
+import io.openmessaging.util.TimeCounter;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
 import java.nio.ByteBuffer;
+import java.sql.Time;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -63,6 +65,8 @@ public class Manager {
     private AtomicLong totalData = new AtomicLong(0);
 
     public Manager() {
+        // 关闭时间统计
+        TimeCounter.disableCounter();
         coolBlock = new PMemSpace2(MntPath.AEP_PATH + "cold", StorageSize.COLD_SPACE_SIZE);
         hotBlock = new PMemSpace2(MntPath.AEP_PATH + "hot", StorageSize.HOT_SPACE_SIZE);
         scheduler = new Disk2AepScheduler2(coolBlock, coldTopicQueueOffsetHandle);
@@ -163,11 +167,17 @@ public class Manager {
             }
         }
 
-//        if (pmemIOFlag != 0) {
-//            long appendTime = pmemIOFlag - startFlag;
-//            long mapTime = mapFlag - startFlag;
-//            long pmemIOTime = pmemIOFlag - write2DiskFlag;
-//            long writeDiskTime = write2DiskFlag - mapFlag;
+        if (pmemIOFlag != 0) {
+            long appendTime = pmemIOFlag - startFlag;
+            long mapTime = mapFlag - startFlag;
+            long pmemIOTime = pmemIOFlag - write2DiskFlag;
+            long writeDiskTime = write2DiskFlag - mapFlag;
+            TimeCounter.getManagerInstance().addTime("map time", (int) mapTime);
+            TimeCounter.getManagerInstance().addTime("pmem io time", (int) pmemIOTime);
+            TimeCounter.getManagerInstance().addTime("ssd io time", (int) writeDiskTime);
+            TimeCounter.getManagerInstance().increaseTimes();
+            TimeCounter.getManagerInstance().analyze();
+
 //            sumAppendTime.addAndGet(appendTime);
 //            sumMapTime.addAndGet(mapTime);
 //            sumPMemIO.addAndGet(pmemIOTime);
@@ -177,7 +187,7 @@ public class Manager {
 //                    appendTime, mapTime, pmemIOTime, writeDiskTime,
 //                    (double) sumMapTime.get() / sumAppendTime.get(), (double) sumPMemIO.get() / sumAppendTime.get(),
 //                    (double) sumDiskIO.get() / sumAppendTime.get());
-//        }
+        }
 
         return appendOffset;
     }
