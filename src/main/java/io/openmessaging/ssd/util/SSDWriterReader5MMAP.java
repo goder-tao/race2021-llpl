@@ -125,8 +125,6 @@ public class SSDWriterReader5MMAP {
             // 当前上写入点+写入的长度-上一个文件的累积offset，计算当前文件的大小，超出默认的一个data partition的大小，新建一个分区
             if (listSize == 1 || (writeStartOffset-accumulativePhyOffset.get(accSize-1))+data.length > StorageSize.GB) {
 
-                System.out.println("list size: "+listSize);
-
                 if (listSize != 1) {
                     // 记录上一个datafile的累计phyOffset
                     accumulativePhyOffset.add(writeStartOffset);

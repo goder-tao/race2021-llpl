@@ -28,8 +28,11 @@ public class Batch extends ConcurrentLinkedQueue<MessagePutRequest> {
                 batchSizeLimit = StorageSize.SMALL_BATCH_SIZE;
             } else if (req.getMessage().getData().length <= StorageSize.MIDDLE_BATCH_SIZE) {
                 batchSizeLimit = StorageSize.MIDDLE_BATCH_SIZE;
-            } else {
+            } else if (req.getMessage().getData().length <= StorageSize.LARGE_BATCH_SIZE) {
                 batchSizeLimit = StorageSize.LARGE_BATCH_SIZE;
+            } else {
+                batchSizeLimit = (int) (StorageSize.MB);
+                System.out.println("exceed max batch limit size");
             }
         }
 

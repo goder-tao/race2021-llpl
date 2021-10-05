@@ -1,5 +1,7 @@
 package io.openmessaging.ssd.aggregator;
 
+import io.openmessaging.util.TimeCounter;
+
 import java.util.concurrent.CountDownLatch;
 
 /**
@@ -23,8 +25,10 @@ public class MessagePutRequest {
         try {
             long t = System.nanoTime();
             wait.await();
-//            System.out.println("6.receive countDown: "+(System.nanoTime()-downTime));
-//            System.out.println("7.await time: "+(System.nanoTime()-t));
+            TimeCounter.getAggregatorInstance().addTime("receive count down time", (int) (System.nanoTime()-downTime));
+            TimeCounter.getAggregatorInstance().addTime("await time", (int) (System.nanoTime()-t));
+            TimeCounter.getAggregatorInstance().increaseTimes();
+            TimeCounter.getAggregatorInstance().analyze();
         } catch (Exception e) {
             e.printStackTrace();
         }
