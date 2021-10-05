@@ -60,7 +60,7 @@ public class testManager {
         Thread[] threads = new Thread[20];
 
         for (int i = 0; i < threads.length; i++) {
-            threads[i] = new Thread(new WriterRunner(manager, i, 15000));
+            threads[i] = new Thread(new WriterRunner(manager, i, 100));
             threads[i].start();
         }
 
@@ -71,8 +71,6 @@ public class testManager {
                 e.printStackTrace();
             }
         }
-
-        SSDWriterReader5MMAP.getInstance().printInfo();
 
         // 冷读
         testParallelRead(manager, "test0", 0, 0, 10, "test1", 0, 0, 15);
@@ -178,7 +176,7 @@ public class testManager {
         Random random = new Random();
         for (int i = s; i < e; i++) {
             int r = 100 + random.nextInt(17000);
-            ByteBuffer data = ByteBuffer.allocate(r);
+            ByteBuffer data = ByteBuffer.allocate(17408);
             data.putInt(i);
             manager.append(topic, qid, data);
         }

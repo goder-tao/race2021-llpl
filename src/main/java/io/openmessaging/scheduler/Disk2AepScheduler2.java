@@ -4,14 +4,13 @@ import io.openmessaging.aep.mmu.MemoryNode;
 import io.openmessaging.aep.space.PMemSpace2;
 import io.openmessaging.ssd.util.SSDWriterReader5MMAP;
 import io.openmessaging.util.MapUtil;
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
 
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -31,6 +30,10 @@ public class Disk2AepScheduler2 implements Runnable {
     private final ConcurrentHashMap<String, Map<Integer, Map<Long, MemoryNode>>> coldTopicQueueOffsetHandle;
     // 记录冷队列数量
     private final AtomicInteger coldQueueCount = new AtomicInteger(0);
+    // 信号量提醒调度群调度
+    private volatile Semaphore waitPoint = new Semaphore(0);
+
+    private final Logger logger = LogManager.getLogger(Disk2AepScheduler2.class.getName());
 
     public Disk2AepScheduler2(PMemSpace2 coldSpace, ConcurrentHashMap<String, Map<Integer, Map<Long, MemoryNode>>> topicQueueOffsetHandle) {
         this.coldSpace = coldSpace;
@@ -42,6 +45,7 @@ public class Disk2AepScheduler2 implements Runnable {
     public void putSchedulerTask(String topic, int queueId, String tName, int fetchNum, PriorityNode node) {
         SchedulerTask task = new SchedulerTask(topic, queueId, tName, fetchNum, node);
         priorityQueue.offer(task);
+        waitPoint.release();
     }
 
     public void increaseQueueCount() {
@@ -55,15 +59,12 @@ public class Disk2AepScheduler2 implements Runnable {
     @Override
     public void run() {
         while (true) {
-            if (priorityQueue.isEmpty()) {
-                try {
-                    Thread.sleep(20);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            } else {
+            try {
+                waitPoint.acquire();
                 SchedulerTask task = priorityQueue.poll();
                 executorService.submit(new SchedulerWorker(task));
+            } catch (InterruptedException e) {
+                logger.error(e.toString());
             }
         }
     }

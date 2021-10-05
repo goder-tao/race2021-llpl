@@ -63,7 +63,7 @@ public class PMemSpace2 implements Space2 {
     }
 
     public ByteBuffer readDataAndFree(MemoryNode node) {
-        byte[] data = threadSpaceMap.get(node.tName).read(node);
+        byte[] data = read(node);
         threadSpaceMap.get(node.tName).free(node);
         ByteBuffer buffer = ByteBuffer.allocate(data.length);
         buffer.put(data);
