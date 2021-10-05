@@ -42,7 +42,7 @@ public class PMemThreadSpace2 implements Space2{
         PMemUnit unit = slots[listNode.slot].get(listNode.key);
         unit.free(listNode);
         // 可以放回内存池中
-        if (unit.getCurrentEntryNum() == 0) {
+        if (unit.isEmpty()) {
             slots[listNode.slot].remove(listNode.key);
             pool.deAllocate(unit);
         }
@@ -59,7 +59,7 @@ public class PMemThreadSpace2 implements Space2{
         int slot = 0;
         // 定位slot
         for (int i = 0; i < 8; i++) {
-            if (data.length < entrySizes[i]) {
+            if (data.length <= entrySizes[i]) {
                 slot = i;
                 break;
             }
@@ -106,7 +106,7 @@ public class PMemThreadSpace2 implements Space2{
             return slots[listNode.slot].get(listNode.key).read(listNode);
         } catch (Exception e) {
             e.printStackTrace();
-            System.out.println("slot: "+listNode.slot+", key: "+listNode.key);
+            logger.error("slot: "+listNode.slot+", key: "+listNode.key);
             return null;
         }
     }

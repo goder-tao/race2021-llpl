@@ -231,6 +231,7 @@ public class Manager {
                 }
             } else {  // 冷队列
                 dataMap = readColdQueueData(topic, queueId, offset, fetchNum, node);
+                scheduler.putSchedulerTask(topic, queueId, topicThreadName.get(topic), fetchNum, node);
             }
         }
         return dataMap;

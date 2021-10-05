@@ -16,7 +16,7 @@ public class PMemUnit implements Space2 {
     private MemoryBlock block;
     // Unit的entry数量和当前数量
     private int entryNum;
-    int currentEntry = 0;
+    private AtomicInteger currentEntry = new AtomicInteger(0);
     // entry大小
     private short entrySize;
     // 使用标识
@@ -38,7 +38,7 @@ public class PMemUnit implements Space2 {
     public void reset(int entryNum, int entrySize) {
         this.entryNum = entryNum;
         this.entrySize = (short) entrySize;
-        currentEntry = 0;
+        currentEntry.set(0);
         arrayFlag = new Boolean[entryNum];
         for (int i = 0; i < entryNum; i++) {
             arrayFlag[i] = Boolean.FALSE;
@@ -48,13 +48,13 @@ public class PMemUnit implements Space2 {
     @Override
     public void free(MemoryNode listNode) {
         arrayFlag[listNode.entryPosition] = Boolean.FALSE;
-        currentEntry--;
+        currentEntry.decrementAndGet();
     }
 
     @Override
     public MemoryNode write(byte[] data) {
         // 已满
-        if (currentEntry == entryNum) {
+        if (currentEntry.get() >= entryNum) {
             return null;
         }
         MemoryNode node = null;
@@ -69,7 +69,7 @@ public class PMemUnit implements Space2 {
                 node.entryPosition = last%entryNum;
                 node.dataSize = (short) data.length;
                 PMemReaderWriter2.getInstance().write(block, node.entryPosition*entrySize, data);
-                currentEntry++;
+                currentEntry.incrementAndGet();
                 break;
             }
             last++;
@@ -88,8 +88,8 @@ public class PMemUnit implements Space2 {
         return PMemReaderWriter2.getInstance().read(block, listNode.entryPosition*entrySize, listNode.dataSize);
     }
 
-    public int getCurrentEntryNum() {
-        return currentEntry;
+    public boolean isEmpty() {
+        return currentEntry.get() <= 0;
     }
 
 }
