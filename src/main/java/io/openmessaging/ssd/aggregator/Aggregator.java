@@ -77,7 +77,7 @@ public class Aggregator implements Runnable {
         while (true) {
             try {
                 // 尝试获取信号量并等待一个比较长的时间，用来处理最后一条消息
-                if (!waitPoint.tryAcquire(200, TimeUnit.MILLISECONDS)) {
+                if (!waitPoint.tryAcquire(100, TimeUnit.MILLISECONDS)) {
                     if (!batch.isEmpty()) {
                         if (hasNewed.compareAndSet(false, true)) {
                             flushBatchQueue.offer(batch);
@@ -131,14 +131,14 @@ public class Aggregator implements Runnable {
                 e.printStackTrace();
             }
 
-            TimeCounter.getAggregatorInstance().addTime("force time", (int) (System.nanoTime()-t));
+            TimeCounter.getAggregatorInstance().addTime("3.force time", (int) (System.nanoTime()-t));
             t = System.nanoTime();
 
             // 通知put线程持久化完成
             for (MessagePutRequest req:flushBatch) {
                 req.countDown(System.nanoTime());
             }
-            TimeCounter.getAggregatorInstance().addTime("count down time", (int) (System.nanoTime()-t));
+            TimeCounter.getAggregatorInstance().addTime("4.count down time", (int) (System.nanoTime()-t));
         }
     }
 
@@ -161,7 +161,7 @@ public class Aggregator implements Runnable {
         long sOff = appendRes.getWriteStartOffset();
         MappedByteBuffer mmap = appendRes.getMmap();
 
-        TimeCounter.getAggregatorInstance().addTime("append time", (int) (System.nanoTime()-t));
+        TimeCounter.getAggregatorInstance().addTime("1.append time", (int) (System.nanoTime()-t));
         t = System.nanoTime();
 
         // 更新index
@@ -170,7 +170,7 @@ public class Aggregator implements Runnable {
             sOff += req.getMessage().getData().length;
         }
 
-        TimeCounter.getAggregatorInstance().addTime("new index time", (int) (System.nanoTime()-t));
+        TimeCounter.getAggregatorInstance().addTime("2.new index time", (int) (System.nanoTime()-t));
 
         executor.submit(new ForceTask(mmap, flushBatch));
     }

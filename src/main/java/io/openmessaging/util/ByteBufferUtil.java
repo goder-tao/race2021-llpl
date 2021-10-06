@@ -14,13 +14,15 @@ public class ByteBufferUtil {
     }
 
     public static void main(String[] args) {
-        ByteBuffer buffer = ByteBuffer.allocate(10);
+        ByteBuffer buffer = ByteBuffer.allocate(11);
         buffer.put("1234567890".getBytes());
-        buffer.limit(5);
+        buffer.flip();
+//        buffer.limit(5);
         ByteBuffer buffer1 = copyFrom(buffer);
         byte[] b = new byte[buffer1.capacity()];
         buffer1.get(b);
         System.out.println(new java.lang.String(b));
+        System.out.println(buffer1.capacity());
     }
 
 }

@@ -56,7 +56,7 @@ public class testManager {
     static void testParallel() {
         Manager manager = new Manager();
 
-        Thread[] threads = new Thread[1];
+        Thread[] threads = new Thread[20];
 
         for (int i = 0; i < threads.length; i++) {
             threads[i] = new Thread(new WriterRunner(manager, i, 100));
@@ -175,7 +175,7 @@ public class testManager {
         Random random = new Random();
         for (int i = s; i < e; i++) {
             int r = 100 + random.nextInt(17000);
-            ByteBuffer data = ByteBuffer.allocate(100);
+            ByteBuffer data = ByteBuffer.allocate(r);
             data.putInt(i);
             manager.append(topic, qid, data);
         }

@@ -66,7 +66,7 @@ public class Manager {
 
     public Manager() {
         // 关闭时间统计
-        TimeCounter.disableCounter();
+//        TimeCounter.disableCounter();
         coolBlock = new PMemSpace2(MntPath.AEP_PATH + "cold", StorageSize.COLD_SPACE_SIZE);
         hotBlock = new PMemSpace2(MntPath.AEP_PATH + "hot", StorageSize.HOT_SPACE_SIZE);
         scheduler = new Disk2AepScheduler2(coolBlock, coldTopicQueueOffsetHandle);
@@ -168,13 +168,14 @@ public class Manager {
         }
 
         if (pmemIOFlag != 0) {
-            long appendTime = pmemIOFlag - startFlag;
-            long mapTime = mapFlag - startFlag;
-            long pmemIOTime = pmemIOFlag - write2DiskFlag;
-            long writeDiskTime = write2DiskFlag - mapFlag;
-            TimeCounter.getManagerInstance().addTime("map time", (int) mapTime);
-            TimeCounter.getManagerInstance().addTime("pmem io time", (int) pmemIOTime);
-            TimeCounter.getManagerInstance().addTime("ssd io time", (int) writeDiskTime);
+            int appendTime = (int) (pmemIOFlag - startFlag);
+            int mapTime = (int) (mapFlag - startFlag);
+            int pmemIOTime = (int) (pmemIOFlag - write2DiskFlag);
+            int writeDiskTime = (int) (write2DiskFlag - mapFlag);
+
+            TimeCounter.getManagerInstance().addTime("map time",  mapTime);
+            TimeCounter.getManagerInstance().addTime("pmem io time", pmemIOTime);
+            TimeCounter.getManagerInstance().addTime("ssd io time",  writeDiskTime);
             TimeCounter.getManagerInstance().increaseTimes();
             TimeCounter.getManagerInstance().analyze();
 

@@ -25,8 +25,8 @@ public class MessagePutRequest {
         try {
             long t = System.nanoTime();
             wait.await();
-            TimeCounter.getAggregatorInstance().addTime("receive count down time", (int) (System.nanoTime()-downTime));
-            TimeCounter.getAggregatorInstance().addTime("await time", (int) (System.nanoTime()-t));
+            TimeCounter.getAggregatorInstance().addTime("5.receive count down time", (int) (System.nanoTime()-downTime));
+//            TimeCounter.getAggregatorInstance().addTime("6.await time", (int) (System.nanoTime()-t));
             TimeCounter.getAggregatorInstance().increaseTimes();
             TimeCounter.getAggregatorInstance().analyze();
         } catch (Exception e) {
@@ -35,8 +35,8 @@ public class MessagePutRequest {
     }
 
     protected void countDown(long downTime) {
-        wait.countDown();
         this.downTime = downTime;
+        wait.countDown();
     }
 
     public Message4Flush getMessage() {

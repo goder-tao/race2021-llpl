@@ -1,5 +1,6 @@
 package io.openmessaging.util;
 
+import java.text.DecimalFormat;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -8,20 +9,28 @@ import java.util.concurrent.atomic.AtomicLong;
  * @author tao
  * @date 2021-10-03*/
 public class TimeCounter {
+    private final String name;
     // 开关
     private  boolean isEnable = true;
     // 计时次数(计算平均用)
-    private AtomicLong countTimes = new AtomicLong(0);
+    private AtomicLong countTimes;
     // 总时间
-    private AtomicLong sumTime = new AtomicLong(0);
+    private AtomicLong sumTime;
     // 其他各个部分的时间
-    private ConcurrentHashMap<String, AtomicLong> partTime = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<String, AtomicLong> partTime;
+    // 百分比小数格式
+    private DecimalFormat decimalFormat=new DecimalFormat("0.000000");
 
-    public static TimeCounter managerTimeCounter = new TimeCounter();
+    // 单例
+    public static TimeCounter managerTimeCounter = new TimeCounter("Manager counter");
 
-    public static TimeCounter aggregatorTimeCounter = new TimeCounter();
+    public static TimeCounter aggregatorTimeCounter = new TimeCounter("Aggregator counter");
 
-    private TimeCounter() {
+    private TimeCounter(String name) {
+        this.name = name;
+        countTimes = new AtomicLong(0);
+        sumTime = new AtomicLong(0);
+        partTime = new ConcurrentHashMap<>();
 
     }
 
@@ -37,6 +46,8 @@ public class TimeCounter {
                     atomicLong = flag;
                 }
                 atomicLong.addAndGet(increment);
+            } else {
+                partTime.get(part).addAndGet(increment);
             }
         }
     }
@@ -54,14 +65,15 @@ public class TimeCounter {
     public void analyze() {
         if (isEnable) {
             StringBuilder stringBuilder1 = new StringBuilder(), stringBuilder2 = new StringBuilder();
-            stringBuilder1.append("average time: total - ").append((sumTime.get()) / countTimes.get());
-            stringBuilder2.append("time percent: ");
+            stringBuilder1.append(this.name+" average time --- total: ").append((sumTime.get()) / countTimes.get());
+            stringBuilder2.append(this.name+" time percent --- ");
             for (String key:partTime.keySet()) {
-                stringBuilder1.append(", "+key+" - "+partTime.get(key).get()/(countTimes.get()));
-                stringBuilder2.append(", "+key+" - "+(partTime.get(key).get()/sumTime.get()));
+                stringBuilder1.append(", "+key+": "+partTime.get(key).get()/(countTimes.get()));
+                stringBuilder2.append(", "+key+": "+decimalFormat.format((double) partTime.get(key).get()/sumTime.get()*100)+"%");
             }
             System.out.println(stringBuilder1.toString());
             System.out.println(stringBuilder2.toString());
+            System.out.println();
         }
     }
 

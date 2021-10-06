@@ -11,6 +11,7 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Random;
@@ -296,9 +297,5 @@ public class test {
     }
 
     public static void main(String[] args) throws IOException {
-        ConcurrentLinkedQueue<Batch> queue = new ConcurrentLinkedQueue<>();
-        Batch batch = new Batch();
-        queue.offer(batch);
-
     }
 }
