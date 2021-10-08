@@ -87,6 +87,7 @@ public class Aggregator implements Runnable {
                     }
                 }
                 doFlush();
+                logger.info("wait queue length: "+flushBatchQueue.size());
             } catch (Exception e) {
                 e.printStackTrace();
                 logger.error("aggregator waitPoint, "+e.toString());
