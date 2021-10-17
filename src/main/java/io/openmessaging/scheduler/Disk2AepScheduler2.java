@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @date 2021-09-23*/
 public class Disk2AepScheduler2 implements Runnable {
     // 线程池
-    private  final ExecutorService executorService = Executors.newFixedThreadPool(10);
+    private  final ExecutorService executorService = Executors.newFixedThreadPool(6);
     // 优先调度队列
     private final ConcurrentLinkedQueue<SchedulerTask> priorityQueue = new ConcurrentLinkedQueue();
     // 冷空间

@@ -7,18 +7,18 @@ import io.openmessaging.util.TimeCounter;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * 向上聚合多个thread的数据，默认8kb聚合，向下调用底层disk写接口写入一批数据
+ * 向上聚合多个thread的数据，默认8kb聚合，多个batch聚合成一个SuperBatch
+ * 减少force的线程，向下调用底层disk写接口写入一批数据
  * 使用线程池异步force，在task中并行进行index以及write data的force，并在
  * 结束之后通知put线程任务完成
- * @version 1.2
- * @data 2021-09-30
+ * @version 1.3
+ * @data 2021-10-16
  * @author tao
  * */
 public class Aggregator implements Runnable {
@@ -30,15 +30,23 @@ public class Aggregator implements Runnable {
 
     private final Logger logger = LogManager.getLogger(Aggregator.class.getName());
     // 线程池、异步force
-    private final ExecutorService executor = Executors.newFixedThreadPool(15);
+    private final ExecutorService executor = Executors.newFixedThreadPool(7);
     // 并行index force线程池
-    private final ExecutorService forceExecutor = Executors.newFixedThreadPool(15);
+    private final ExecutorService forceExecutor = Executors.newFixedThreadPool(7);
     // 使用一个信号量进行唤醒
     private final Semaphore waitPoint = new Semaphore(0);
     private AtomicBoolean hasNewed = new AtomicBoolean(false);
+    // SuperBatch的大小
+    private final int superBatchSize = 3;
+    // SuperBatch计数
+    private long superBatchCounter = 1;
+    // 每次run之间的时间间隔
+    private long t;
+
 
     public Aggregator(IndexHandle indexHandle) {
         this.indexHandle = indexHandle;
+        t = System.nanoTime();
     }
 
     /**
@@ -54,14 +62,23 @@ public class Aggregator implements Runnable {
                 flushBatchQueue.offer(batch);
                 batch = new Batch();
             }
-            waitPoint.release();
+
+            if (superBatchCounter % superBatchSize == 0) {
+                waitPoint.release();
+            }
+            superBatchCounter++;
+
             batch.tryToAdd(req);
         } else if (batch.isCanFlush()) {
             if (hasNewed.compareAndSet(false, true)) {
                 flushBatchQueue.offer(batch);
                 batch = new Batch();
             }
-            waitPoint.release();
+
+            if (superBatchCounter % superBatchSize == 0) {
+                waitPoint.release();
+            }
+            superBatchCounter++;
         }
         hasNewed.set(false);
         TimeCounter.getAggregatorInstance().addTime("request enqueue time", (int) (System.nanoTime()-t));
@@ -77,18 +94,26 @@ public class Aggregator implements Runnable {
     public void run() {
         while (true) {
             try {
+                System.out.println("run time: "+(System.nanoTime()-t));
+                t = System.nanoTime();
                 // 尝试获取信号量并等待一个比较长的时间，用来处理最后一条消息
                 if (!waitPoint.tryAcquire(10, TimeUnit.MILLISECONDS)) {
                     if (!batch.isEmpty()) {
+                        flushBatchQueue.offer(batch);
+                        batch = new Batch();
                         if (hasNewed.compareAndSet(false, true)) {
                             flushBatchQueue.offer(batch);
                             batch = new Batch();
+                            // 非信号通知的情况下重置，从新按照superBatchSize来通知信号
+                            superBatchCounter = 1;
                         }
                         hasNewed.set(false);
                     }
                 }
                 logger.info("wait queue length: "+flushBatchQueue.size());
+                long T = System.nanoTime();
                 doFlush();
+                System.out.println("do flush time: "+(System.nanoTime()-T));
             } catch (Exception e) {
                 e.printStackTrace();
                 logger.error("aggregator waitPoint, "+e.toString());
@@ -101,12 +126,12 @@ public class Aggregator implements Runnable {
     private class ForceTask implements Runnable{
 //        private RandomAccessFile raf;
         private MappedByteBuffer mmap;
-        private Batch flushBatch;
+        private SuperBatch superBatch;
         private volatile CountDownLatch forceCountDown = new CountDownLatch(1);
 
-        ForceTask(MappedByteBuffer mmap, Batch flushBatch) {
+        ForceTask(MappedByteBuffer mmap, SuperBatch superBatch) {
             this.mmap = mmap;
-            this.flushBatch = flushBatch;
+            this.superBatch = superBatch;
         }
 
         @Override
@@ -127,19 +152,22 @@ public class Aggregator implements Runnable {
 //                e.printStackTrace();
 //            }
 
-            try {
-                forceCountDown.await();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+//            try {
+//                forceCountDown.await();
+//            } catch (InterruptedException e) {
+//                e.printStackTrace();
+//            }
 
             TimeCounter.getAggregatorInstance().addTime("3.force time", (int) (System.nanoTime()-t));
             t = System.nanoTime();
 
             // 通知put线程持久化完成
-            for (MessagePutRequest req:flushBatch) {
-                req.countDown(System.nanoTime());
+            for (Batch flushBatch:superBatch) {
+                for (MessagePutRequest req:flushBatch) {
+                    req.countDown(System.nanoTime());
+                }
             }
+
             TimeCounter.getAggregatorInstance().addTime("4.count down time", (int) (System.nanoTime()-t));
         }
     }
@@ -150,12 +178,27 @@ public class Aggregator implements Runnable {
      * put线程任务完成*/
     private void doFlush() {
         long t = System.nanoTime();
-        Batch flushBatch = flushBatchQueue.poll();
-        if (flushBatch == null || flushBatch.isEmpty()) return;
 
-        ByteBuffer dataBuffer = ByteBuffer.allocate(flushBatch.getBatchSize());
-        for (MessagePutRequest req:flushBatch) {
-            dataBuffer.put(req.getMessage().getData());
+        if (flushBatchQueue.size() == 0) {
+            return;
+        }
+
+        SuperBatch superBatch = new SuperBatch();
+        for (int i = 0; i < superBatchSize; i++) {
+            Batch flushBatch = flushBatchQueue.poll();
+            if (flushBatch == null || flushBatch.isEmpty()) break;
+            superBatch.AddBatch(flushBatch);
+        }
+
+        if (superBatch.size() == 0) {
+            return;
+        }
+
+        ByteBuffer dataBuffer = ByteBuffer.allocate(superBatch.getSuperBatchSize());
+        for (Batch flushBatch:superBatch) {
+            for (MessagePutRequest req:flushBatch) {
+                dataBuffer.put(req.getMessage().getData());
+            }
         }
 
         // 刷盘
@@ -167,13 +210,15 @@ public class Aggregator implements Runnable {
         t = System.nanoTime();
 
         // 更新index
-        for (MessagePutRequest req:flushBatch) {
-            indexHandle.newIndex(req.getMessage().getHashKey(), sOff, (short) req.getMessage().getData().length);
-            sOff += req.getMessage().getData().length;
+        for (Batch flushBatch:superBatch) {
+            for (MessagePutRequest req:flushBatch) {
+                indexHandle.newIndex(req.getMessage().getHashKey(), sOff, (short) req.getMessage().getData().length);
+                sOff += req.getMessage().getData().length;
+            }
         }
 
         TimeCounter.getAggregatorInstance().addTime("2.new index time", (int) (System.nanoTime()-t));
 
-        executor.submit(new ForceTask(mmap, flushBatch));
+        executor.submit(new ForceTask(mmap, superBatch));
     }
 }

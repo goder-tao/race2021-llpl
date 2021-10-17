@@ -19,7 +19,6 @@ import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
 import java.nio.ByteBuffer;
-import java.sql.Time;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -73,6 +72,7 @@ public class Manager {
         indexHandle = IndexHandle.getInstance();
         aggregator = new Aggregator(indexHandle);
         Thread aggThread = new Thread(aggregator);
+        aggThread.setPriority(10);
         aggThread.start();
         createTime = System.nanoTime();
     }
@@ -141,7 +141,7 @@ public class Manager {
                     }
                 }
                 // 更新队列信息
-                node.queueDataSize.addAndGet(b1.capacity());
+                node.queueDataSize.addAndGet(b1.remaining());
                 // 更新下一个不在aep中的offset， 当前offset已经加入到aep中
                 if (appendOffset + 1 > node.tailOffset.get()) {
                     node.tailOffset.set(appendOffset + 1);

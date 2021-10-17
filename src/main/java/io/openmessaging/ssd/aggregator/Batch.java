@@ -2,6 +2,7 @@ package io.openmessaging.ssd.aggregator;
 
 import io.openmessaging.constant.StorageSize;
 
+import java.util.ArrayList;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -50,5 +51,24 @@ public class Batch extends ConcurrentLinkedQueue<MessagePutRequest> {
 
     public boolean isCanFlush() {
         return batchSize.get() >= batchSizeLimit;
+    }
+}
+
+/**
+ * 多个Batch进行一次force，减少线程数量*/
+class SuperBatch extends ArrayList<Batch> {
+    private int superBatchSize = 0;
+
+    public SuperBatch() {
+
+    }
+
+    public void AddBatch(Batch batch) {
+        this.superBatchSize += batch.getBatchSize();
+        super.add(batch);
+    }
+
+    public int getSuperBatchSize() {
+        return superBatchSize;
     }
 }

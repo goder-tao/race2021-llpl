@@ -46,7 +46,7 @@ public class SSDWriterReader5MMAP {
         if (fileNames != null) {
             Arrays.sort(fileNames);
         }
-        logger = LogManager.getLogger(SSDWriterReader5.class.getName());
+        logger = LogManager.getLogger(SSDWriterReader5MMAP.class.getName());
         // 构造list
         try {
             // 模拟第0个文件，大小为0，使得List的index逻辑上和文件的排序相同，比如index-1对应第一个文件
