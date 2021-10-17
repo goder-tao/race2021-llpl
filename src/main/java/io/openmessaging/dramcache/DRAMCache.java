@@ -5,14 +5,12 @@ import io.openmessaging.util.MapUtil;
 import io.openmessaging.util.SystemMemory;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
-import sun.misc.Lock;
 
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-
 
 public class DRAMCache {
     private final Logger logger;
@@ -25,7 +23,7 @@ public class DRAMCache {
     // 当前内存
     private long currentMemory = 0L;
     // 内存监视频率(100ms)
-    private final int freq = 100;
+    private final int freq = 500;
     // 单次
     private AtomicBoolean startDetect = new AtomicBoolean(false);
 

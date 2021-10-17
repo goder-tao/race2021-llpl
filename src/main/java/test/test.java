@@ -2,32 +2,26 @@ package test;
 
 import io.openmessaging.constant.MntPath;
 import io.openmessaging.constant.StorageSize;
-import io.openmessaging.scheduler.PriorityNode;
-import io.openmessaging.ssd.aggregator.Batch;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
-import java.text.DecimalFormat;
-import java.util.ArrayList;
-import java.util.Base64;
 import java.util.Random;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class test {
 
     // 半秒顺序写 300+MB文件  600+MB/s
+    //
     static void writeTest() {
         try {
             RandomAccessFile raf = new RandomAccessFile(MntPath.SSD_PATH+"test", "rw");
             FileChannel channel = raf.getChannel();
             int writeTimes = 5000;
-            int writeSize = 8100;
+            int writeSize = 32768;
+//            int writeSize = 8192;
             long t = System.nanoTime();
             long ft = 0;
             for (int i = 0; i < writeTimes; i++) {
@@ -58,7 +52,8 @@ public class test {
      * */
     static void testParallelWriteSame() {
         AtomicLong off = new AtomicLong(0);
-        int threadCount = 4;
+        AtomicLong I = new AtomicLong(0);
+        int threadCount = 20;
         Thread[] threads = new Thread[threadCount];
         long t = System.nanoTime();
         for (int i = 0; i < threads.length; i++) {
@@ -77,9 +72,11 @@ public class test {
                         for (int i = 0; i < writeTimes; i++) {
                             long offset = off.getAndAdd(writeSize);
                             channel.write(ByteBuffer.wrap(new byte[writeSize]), offset);
-//                            if ((i+1)%5==0){
-//                                channel.force(true);
-//                            }
+                            channel.force(true);
+                            I.incrementAndGet();
+                            if ((I.get()+1)%5==0){
+                                channel.force(true);
+                            }
                         }
                     } catch (Exception e) {
                         e.printStackTrace();
@@ -195,7 +192,7 @@ public class test {
 
     // 使用mmap并发写多个文件, 每次只map对应要写入的范围 -> 20MB/s
     static void testParallelWriteMultiMmapFile() {
-        int threadCount = 4;
+        int threadCount = 10;
         Thread[] threads = new Thread[threadCount];
         long t = System.nanoTime();
         for (int i = 0; i < threads.length; i++) {
@@ -296,6 +293,68 @@ public class test {
         System.out.println("average time: "+(System.nanoTime()-t)/writeTimes);
     }
 
+    // 测试force时候会不会让出cpu
+    static void testForceCpu() {
+        Thread thread1, thread2;
+        thread1 = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                Random random = new Random();
+                int fi = random.nextInt(8192);
+                int writeTimes = 100;
+                int writeSize = 8100;
+
+                try {
+                    RandomAccessFile raf = new RandomAccessFile(MntPath.SSD_PATH+"test"+fi, "rw");
+                    FileChannel channel = raf.getChannel();
+                    for (int i = 0; i < writeTimes; i++) {
+                        System.out.println("start write");
+                        channel.write(ByteBuffer.wrap(new byte[writeSize]));
+                        System.out.println("start force");
+                        channel.force(true);
+                        System.out.println("force finish");
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+
+        thread2 = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                for (int i = 0; i < 1000; i++) {
+                    System.out.println("just out put");
+                }
+            }
+        });
+        thread1.start();
+        thread2.start();
+    }
+
+    // 测试不同写入大小force的时间开销
+    // ->结论：和size非线性关系，10*size的force时间只增大了差不多两倍
+    static void testDifferentSizeForceTime() {
+        try {
+            RandomAccessFile raf = new RandomAccessFile(MntPath.SSD_PATH+"test", "rw");
+            FileChannel channel = raf.getChannel();
+            int writeTimes = 2000;
+            int writeSize = 8192;
+//             int writeSize = 16384;
+            long t = System.nanoTime();
+            for (int i = 0; i < writeTimes; i++) {
+                channel.write(ByteBuffer.wrap(new byte[writeSize]));
+                if (i % 3 == 0) {
+                    channel.force(true);
+                }
+            }
+            System.out.println("average force time: "+(System.nanoTime()-t)/writeTimes);
+        } catch (Exception e){
+            e.printStackTrace();
+        }
+    }
+
     public static void main(String[] args) throws IOException {
+        testDifferentSizeForceTime();
     }
 }

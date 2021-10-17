@@ -11,6 +11,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
@@ -23,17 +24,17 @@ import java.util.concurrent.atomic.AtomicLong;
  * @date 2021-09-30*/
 public class SSDWriterReader5 {
     // 单例
-    private static SSDWriterReader5 instance = new SSDWriterReader5();
-    // 每个文件的文件名按照次序递增，用一个list记录所有打开的文件对象，留给read复用
+    private static final SSDWriterReader5 instance = new SSDWriterReader5();
+    // 用一个list保存按创建顺序添加的文件raf对象，留给read复用
     private ArrayList<RandomAccessFile> fileList = new ArrayList<>();
     // 记录到当前datafile的总偏移量，read时的精确定位文件
     private ArrayList<Long> accumulativePhyOffset = new ArrayList<>();
     // 记录所有datafile的偏移量之和, 计算当前的写入点
-    private AtomicLong finalPhyOffset = new AtomicLong(0);
+    private long finalPhyOffset = 0L;
     // datafile保存的根目录
     private final String dataFileDir = MntPath.DATA_FILE_DIR;
 
-    private static final Logger logger = LogManager.getLogger(SSDWriterReader5.class.getName());
+    private final Logger logger;
 
     private SSDWriterReader5() {
         File dir = new File(dataFileDir);
@@ -45,13 +46,18 @@ public class SSDWriterReader5 {
         if (fileNames != null) {
             Arrays.sort(fileNames);
         }
+        logger = LogManager.getLogger(SSDWriterReader5.class.getName());
         // 构造list
         try {
+            // 模拟第0个文件，大小为0，使得List的index逻辑上和文件的排序相同，比如index-1对应第一个文件
+            accumulativePhyOffset.add(0L);
+            fileList.add(null);
             if (fileNames != null) {
-                for (String filename: fileNames) {
-                    RandomAccessFile file = new RandomAccessFile(dataFileDir+filename, "rw");
-                    finalPhyOffset.addAndGet(file.length());
-                    accumulativePhyOffset.add(finalPhyOffset.get());
+                for (int i = 0; i < fileNames.length; i++) {
+                    logger.info("open file "+fileNames[i]);
+                    RandomAccessFile file = new RandomAccessFile(dataFileDir+fileNames[i], "rw");
+                    finalPhyOffset += file.length();
+                    accumulativePhyOffset.add(finalPhyOffset);
                     fileList.add(file);
                 }
             }
@@ -78,18 +84,22 @@ public class SSDWriterReader5 {
         byte[] b = new byte[size];
         // 读数据的起点
         int off;
-        // 粗略定位
-        int fileIndex = (int) (phyOffset/ StorageSize.GB);
+        // 粗略定位逻辑上的第几个文件
+        int fileIndex = (int) (phyOffset/ StorageSize.GB)+1;
 
-        if (!accumulativePhyOffset.isEmpty() && accumulativePhyOffset.get(fileIndex) < phyOffset) {
+        // 精确定位，看读取的offset和对应datafile的累积offset之间的关系
+        if (accumulativePhyOffset.size() > fileIndex && accumulativePhyOffset.get(fileIndex) != null && accumulativePhyOffset.get(fileIndex) < phyOffset) {
             fileIndex++;
         }
 
-        off = fileIndex == 0 ? (int) phyOffset : (int) (phyOffset - accumulativePhyOffset.get(fileIndex - 1));
+        off = (int) (phyOffset - accumulativePhyOffset.get(fileIndex-1));
 
         try {
-            fileList.get(fileIndex).seek(off);
-            fileList.get(fileIndex).read(b, 0, b.length);
+            String fileName = PartitionMaker.makePartitionPath(fileIndex, 5, 1)+".data";
+            RandomAccessFile raf = new RandomAccessFile(dataFileDir+"/"+fileName, "r");
+            raf.seek(off);
+            raf.read(b, 0, b.length);
+            raf.close();
         } catch (Exception e) {
             logger.error("fileList get fail, "+e.toString());
         }
@@ -98,36 +108,44 @@ public class SSDWriterReader5 {
 
     /**
      * 单线程顺序写入
-     * @return: 本次写入的起点*/
+     * @return: 本次写入的起点和用于force的raf对象*/
     public AppendRes append(byte[] data) {
         // 写入点
-        long writeStartOffset = finalPhyOffset.getAndAdd(data.length);
+        long writeStartOffset = finalPhyOffset;
+        finalPhyOffset += data.length;
+        // listSize总是比accSize大一，因为acc只有当前datafile满的时候才会新增，而list在当前文件未满的时候就已经存在datafile的raf对象了
         int listSize = fileList.size();
-        FileChannel channel;
+        int accSize = accumulativePhyOffset.size();
         RandomAccessFile raf = null;
-
         try {
-            // 超出默认的一个data partition的大小或首个partition，新建一个分区
-            if (listSize == 0 || fileList.get(listSize-1).length()+data.length > StorageSize.GB) {
-                // 记录上一个datafile的累计phyOffset
-                if (listSize != 0 && fileList.get(listSize-1).length()+data.length > StorageSize.GB) {
-                    accumulativePhyOffset.add(finalPhyOffset.get());
+            // 当前上写入点+写入的长度-上一个文件的累积offset，计算当前文件的大小，超出默认的一个data partition的大小，新建一个分区
+            if (listSize == 1 || (writeStartOffset-accumulativePhyOffset.get(accSize-1))+data.length > StorageSize.GB) {
+
+                if (listSize != 1) {
+                    // 记录上一个datafile的累计phyOffset
+                    accumulativePhyOffset.add(writeStartOffset);
+                    accSize++;
                 }
+
+                // 截掉上一个datafile因为mmap创建出来多余的部分
+                if (fileList.get(listSize-1) != null) {
+                    fileList.get(listSize-1).getChannel().truncate(accumulativePhyOffset.get(accSize-1)-accumulativePhyOffset.get(accSize-2));
+                }
+
+                // 新建一个datafile
                 String fileName = PartitionMaker.makePartitionPath(listSize, 5, 1)+".data";
                 raf = new RandomAccessFile(dataFileDir+"/"+fileName, "rw");
                 fileList.add(raf);
-                listSize++;
             }
 
             // 写入
-            String fileName = PartitionMaker.makePartitionPath(listSize-1, 5, 1)+".data";
+            String fileName = PartitionMaker.makePartitionPath(listSize, 5, 1)+".data";
             raf = new RandomAccessFile(dataFileDir+"/"+fileName, "rw");
-            channel = raf.getChannel();
-            channel.write(ByteBuffer.wrap(data), writeStartOffset);
+            raf.seek(writeStartOffset);
+            raf.write(data);
         } catch (IOException e) {
             logger.error("try to get file length fail, "+e.toString());
         }
-
         return new AppendRes(raf, writeStartOffset);
     }
 

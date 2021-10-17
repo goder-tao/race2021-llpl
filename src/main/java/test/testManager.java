@@ -59,7 +59,7 @@ public class testManager {
         Thread[] threads = new Thread[20];
 
         for (int i = 0; i < threads.length; i++) {
-            threads[i] = new Thread(new WriterRunner(manager, i, 100));
+            threads[i] = new Thread(new WriterRunner(manager, i, 2000));
             threads[i].start();
         }
 
