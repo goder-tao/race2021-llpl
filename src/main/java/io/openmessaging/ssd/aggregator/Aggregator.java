@@ -37,7 +37,7 @@ public class Aggregator implements Runnable {
     private final Semaphore waitPoint = new Semaphore(0);
     private AtomicBoolean hasNewed = new AtomicBoolean(false);
     // SuperBatch的大小
-    private final int superBatchSize = 2;
+    private final int superBatchSize = 5;
     // SuperBatch计数
     private long superBatchCounter = 1;
     // 每次run之间的时间间隔
