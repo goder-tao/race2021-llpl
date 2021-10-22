@@ -139,15 +139,16 @@ public class Aggregator implements Runnable {
         public void run() {
             long t = System.nanoTime();
             // 并行 force index mmap
-//            forceExecutor.execute(() -> {
-//                IndexHandle.getInstance().force();
-//                forceCountDown.countDown();
-//            });
+            forceExecutor.execute(() -> {
+                IndexHandle.getInstance().force();
+                forceCountDown.countDown();
+            });
 
             IndexHandle.getInstance().force();
 
             // force datafile
-            mmap.force();
+//            mmap.force();
+
 //            try {
 //                raf.getChannel().force(true);
 //                raf.close();
@@ -155,11 +156,11 @@ public class Aggregator implements Runnable {
 //                e.printStackTrace();
 //            }
 
-//            try {
-//                forceCountDown.await();
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
+            try {
+                forceCountDown.await();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
 
             TimeCounter.getAggregatorInstance().addTime("3.force time", (int) (System.nanoTime()-t));
             t = System.nanoTime();
