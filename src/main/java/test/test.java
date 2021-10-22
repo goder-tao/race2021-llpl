@@ -49,21 +49,19 @@ public class test {
      * 1、利用点位并发写同一个文件+force -> 2MB/s
      * 2、一个文件8kb写+每次force -> 15MB/s
      * 3、并发点位并发写同一个文件不force，并发非顺序写 -> 600MB/s
+     * 4、并发点位写同一个文件force -> 40MB/s
      * */
     static void testParallelWriteSame() {
         AtomicLong off = new AtomicLong(0);
-        AtomicLong I = new AtomicLong(0);
-        int threadCount = 20;
+        int threadCount = 10;
         Thread[] threads = new Thread[threadCount];
         long t = System.nanoTime();
         for (int i = 0; i < threads.length; i++) {
             threads[i] = new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    Random random = new Random();
                     long startTime = System.nanoTime();
-                    int fi = random.nextInt(8192);
-                    int writeTimes = 10000;
+                    int writeTimes = 1000;
                     int writeSize = 8100;
 
                     try {
@@ -73,10 +71,6 @@ public class test {
                             long offset = off.getAndAdd(writeSize);
                             channel.write(ByteBuffer.wrap(new byte[writeSize]), offset);
                             channel.force(true);
-                            I.incrementAndGet();
-                            if ((I.get()+1)%5==0){
-                                channel.force(true);
-                            }
                         }
                     } catch (Exception e) {
                         e.printStackTrace();
@@ -293,45 +287,6 @@ public class test {
         System.out.println("average time: "+(System.nanoTime()-t)/writeTimes);
     }
 
-    // 测试force时候会不会让出cpu
-    static void testForceCpu() {
-        Thread thread1, thread2;
-        thread1 = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                Random random = new Random();
-                int fi = random.nextInt(8192);
-                int writeTimes = 100;
-                int writeSize = 8100;
-
-                try {
-                    RandomAccessFile raf = new RandomAccessFile(MntPath.SSD_PATH+"test"+fi, "rw");
-                    FileChannel channel = raf.getChannel();
-                    for (int i = 0; i < writeTimes; i++) {
-                        System.out.println("start write");
-                        channel.write(ByteBuffer.wrap(new byte[writeSize]));
-                        System.out.println("start force");
-                        channel.force(true);
-                        System.out.println("force finish");
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        });
-
-        thread2 = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                for (int i = 0; i < 1000; i++) {
-                    System.out.println("just out put");
-                }
-            }
-        });
-        thread1.start();
-        thread2.start();
-    }
-
     // 测试不同写入大小force的时间开销
     // ->结论：和size非线性关系，10*size的force时间只增大了差不多两倍
     static void testDifferentSizeForceTime() {
@@ -355,6 +310,6 @@ public class test {
     }
 
     public static void main(String[] args) throws IOException {
-        testDifferentSizeForceTime();
+        testParallelWriteSame();
     }
 }

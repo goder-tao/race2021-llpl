@@ -13,6 +13,14 @@ public class ByteBufferUtil {
         return dst;
     }
 
+    public static ByteBuffer copyFromDirect(ByteBuffer src) {
+        src.rewind();
+        ByteBuffer dst = DirectBufferPool.getInstance().allocate();
+        dst.put(src);
+        dst.flip();
+        return dst;
+    }
+
     public static void main(String[] args) {
         ByteBuffer buffer = ByteBuffer.allocate(11);
         buffer.put("1234567890".getBytes());

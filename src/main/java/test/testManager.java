@@ -56,7 +56,7 @@ public class testManager {
     static void testParallel() {
         Manager manager = new Manager();
 
-        Thread[] threads = new Thread[20];
+        Thread[] threads = new Thread[30];
 
         for (int i = 0; i < threads.length; i++) {
             threads[i] = new Thread(new WriterRunner(manager, i, 2000));

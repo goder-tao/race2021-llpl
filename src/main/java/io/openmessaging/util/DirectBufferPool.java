@@ -14,9 +14,9 @@ public class DirectBufferPool {
     // 单例
     private static final DirectBufferPool instance = new DirectBufferPool();
     // 每个buffer的最大size 24K
-    private int defaultUnitSize = (int) (StorageSize.KB * 24);
+    private int defaultUnitSize = (int) (StorageSize.KB * 150);
     // 池大小
-    private int poolSize = 500;
+    private int poolSize = 1000;
     // 用队列保存池
     private ConcurrentLinkedQueue<ByteBuffer> pool = new ConcurrentLinkedQueue<>();
 
@@ -34,7 +34,9 @@ public class DirectBufferPool {
 
     // 分配一个buffer
     public ByteBuffer allocate() {
-        return pool.poll();
+        ByteBuffer buf = pool.poll();
+        buf.clear();
+        return buf;
     }
 
     public static DirectBufferPool getInstance() {

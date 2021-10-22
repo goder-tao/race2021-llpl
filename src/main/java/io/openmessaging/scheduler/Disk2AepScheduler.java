@@ -110,7 +110,7 @@ public class Disk2AepScheduler {
                 ByteBuffer bb = ssdWriterReader.directRead((move.topic+move.queueId+(tailOffset+i)).hashCode());
                 if (bb == null) break;
                 byte[] b = bb.array();
-                MemoryNode handle = pmemBlock.write(b, move.tName);
+                MemoryNode handle = pmemBlock.write(bb, move.tName);
                 if (handle != null) {  // 分配空间成功，保存
                     offsetHandle.put(tailOffset+i, handle);
                 } else {  // 分配空间失败，空间不足，修改tailOffset,退出

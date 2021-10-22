@@ -29,13 +29,15 @@ public class SystemMemory {
     }
 
     public static void main(String[] args) {
+        long t = System.nanoTime();
         for (int i = 0; i < 20000; i++) {
             System.out.println(getSystemAvailableMemory() / StorageSize.GB);
             try {
-                Thread.sleep(100);
+                Thread.sleep(500);
             } catch (Exception e) {
 
             }
         }
+        System.out.println("average time: "+(System.nanoTime()-t)/20000);
     }
 }

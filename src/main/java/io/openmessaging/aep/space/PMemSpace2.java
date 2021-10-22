@@ -35,7 +35,7 @@ public class PMemSpace2 implements Space2 {
 
     /**
      * 写入对应线程的ThreadSpace, 首次先进行创建，保证并发安全*/
-    public MemoryNode write(byte[] data, String tName) {
+    public MemoryNode write(ByteBuffer data, String tName) {
         PMemThreadSpace2 space = threadSpaceMap.get(tName);
         // 还未创建
         if (space == null) {
@@ -53,7 +53,7 @@ public class PMemSpace2 implements Space2 {
     }
 
     @Override
-    public MemoryNode write(byte[] data) {
+    public MemoryNode write(ByteBuffer data) {
         return null;
     }
 

@@ -6,6 +6,7 @@ import io.openmessaging.aep.space.PMemThreadSpace2;
 import io.openmessaging.aep.space.Space2;
 import io.openmessaging.aep.util.PMemReaderWriter2;
 
+import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -52,7 +53,7 @@ public class PMemUnit implements Space2 {
     }
 
     @Override
-    public MemoryNode write(byte[] data) {
+    public MemoryNode write(ByteBuffer data) {
         // 已满
         if (currentEntry.get() >= entryNum) {
             return null;
@@ -67,7 +68,7 @@ public class PMemUnit implements Space2 {
                 arrayFlag[last%entryNum] = Boolean.TRUE;
                 node = new MemoryNode();
                 node.entryPosition = last%entryNum;
-                node.dataSize = (short) data.length;
+                node.dataSize = (short) data.remaining();
                 PMemReaderWriter2.getInstance().write(block, node.entryPosition*entrySize, data);
                 currentEntry.incrementAndGet();
                 break;

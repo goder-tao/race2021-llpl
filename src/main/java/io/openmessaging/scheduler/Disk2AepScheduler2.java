@@ -98,7 +98,7 @@ public class Disk2AepScheduler2 implements Runnable {
                 ByteBuffer bb = SSDWriterReader5MMAP.getInstance().directRead((task.topic+"#"+task.queueId+"#"+(tailOffset+i)).hashCode());
                 if (bb == null) break;
                 byte[] b = bb.array();
-                MemoryNode handle = coldSpace.write(b, task.tName);
+                MemoryNode handle = coldSpace.write(bb, task.tName);
                 if (handle != null) {  // 分配空间成功，保存
                     offsetHandle.put(tailOffset+i, handle);
                 } else {  // 分配空间失败，空间不足，修改tailOffset,退出

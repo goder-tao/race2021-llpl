@@ -100,11 +100,11 @@ public class Manager {
 
         mapFlag = System.nanoTime();
 
-        ByteBuffer b1 = ByteBufferUtil.copyFrom(data);
+//        ByteBuffer b1 = ByteBufferUtil.copyFromDirect(data);
 
         // 生成MessageRequest
         int hashKey = (topic+"#"+queueId+"#"+appendOffset).hashCode();
-        Message4Flush message4Flush = new Message4Flush(b1.array(), hashKey);
+        Message4Flush message4Flush = new Message4Flush(data, hashKey);
         MessagePutRequest request = new MessagePutRequest(message4Flush);
 
         // 将request送入aggregator进行聚合
@@ -120,7 +120,7 @@ public class Manager {
         // 分阶段
         if (!isStageChanged.get()) {  // 第一阶段
             // 尝试写aep
-            MemoryNode memoryNode = writePMemOnly(coolBlock, b1.array(), tName);
+            MemoryNode memoryNode = writePMemOnly(coolBlock, data, tName);
 
             pmemIOFlag = System.nanoTime();
 
@@ -141,7 +141,7 @@ public class Manager {
                     }
                 }
                 // 更新队列信息
-                node.queueDataSize.addAndGet(b1.remaining());
+                node.queueDataSize.addAndGet(data.remaining());
                 // 更新下一个不在aep中的offset， 当前offset已经加入到aep中
                 if (appendOffset + 1 > node.tailOffset.get()) {
                     node.tailOffset.set(appendOffset + 1);
@@ -151,10 +151,10 @@ public class Manager {
             // 冷热队列判断, 不再有新的队列加入进来, 热队列会被删掉, 根据null值判队列冷热
             if (node == null) {  // 热队列
                 if (dramCache != null && dramCache.isCacheAvailable()) {  // 缓存在dram
-                    dramCache.put(topic + queueId, appendOffset, b1);
+                    dramCache.put(topic + queueId, appendOffset, ByteBufferUtil.copyFromDirect(data));
                 } else {  // 缓存在aep
 
-                    MemoryNode memoryNode = writePMemOnly(hotBlock, b1.array(), tName);
+                    MemoryNode memoryNode = writePMemOnly(hotBlock, data, tName);
                     pmemIOFlag = System.nanoTime();
 
                     // 写入aep成功
@@ -189,7 +189,7 @@ public class Manager {
 //                    (double) sumMapTime.get() / sumAppendTime.get(), (double) sumPMemIO.get() / sumAppendTime.get(),
 //                    (double) sumDiskIO.get() / sumAppendTime.get());
         }
-
+//        DirectBufferPool.getInstance().deAllocate(b1);
         return appendOffset;
     }
 
@@ -252,7 +252,7 @@ public class Manager {
      * 完成只写aep的工作
      * @return: handle of allocated MemoryBlock
      */
-    MemoryNode writePMemOnly(PMemSpace2 space, byte[] data, String tName) {
+    MemoryNode writePMemOnly(PMemSpace2 space, ByteBuffer data, String tName) {
         return space.write(data, tName);
     }
 

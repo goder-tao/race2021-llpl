@@ -2,6 +2,8 @@ package io.openmessaging.aep.util;
 
 import com.intel.pmem.llpl.MemoryBlock;
 
+import java.nio.ByteBuffer;
+
 /**
  * 非针对某个特定MemoryBlock的ReaderWriter, 减少ReaderWriter的对象创建
  * @author tao */
@@ -31,8 +33,8 @@ public class PMemReaderWriter2 {
      * @param offset - 写入开始的位置
      * @param data   - 写入的数据
      */
-    public void write(MemoryBlock block, long offset, byte[] data) {
-        block.copyFromArray(data, 0, offset, data.length);
+    public void write(MemoryBlock block, long offset, ByteBuffer data) {
+        block.copyFromArray(data.array(), 0, offset, data.remaining());
     }
 
     /**

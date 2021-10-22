@@ -3,6 +3,7 @@ package io.openmessaging.ssd.aggregator;
 import io.openmessaging.ssd.index.IndexHandle;
 import io.openmessaging.ssd.util.AppendRes2;
 import io.openmessaging.ssd.util.SSDWriterReader5MMAP;
+import io.openmessaging.util.DirectBufferPool;
 import io.openmessaging.util.TimeCounter;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
@@ -30,14 +31,14 @@ public class Aggregator implements Runnable {
 
     private final Logger logger = LogManager.getLogger(Aggregator.class.getName());
     // 线程池、异步force
-    private final ExecutorService executor = Executors.newFixedThreadPool(7);
+    private final ExecutorService executor = Executors.newFixedThreadPool(20);
     // 并行index force线程池
-    private final ExecutorService forceExecutor = Executors.newFixedThreadPool(7);
+    private final ExecutorService forceExecutor = Executors.newFixedThreadPool(20);
     // 使用一个信号量进行唤醒
     private final Semaphore waitPoint = new Semaphore(0);
     private AtomicBoolean hasNewed = new AtomicBoolean(false);
     // SuperBatch的大小
-    private final int superBatchSize = 3;
+    private final int superBatchSize = 1;
     // SuperBatch计数
     private long superBatchCounter = 1;
     // 每次run之间的时间间隔
@@ -138,10 +139,12 @@ public class Aggregator implements Runnable {
         public void run() {
             long t = System.nanoTime();
             // 并行 force index mmap
-            forceExecutor.execute(() -> {
-                IndexHandle.getInstance().force();
-                forceCountDown.countDown();
-            });
+//            forceExecutor.execute(() -> {
+//                IndexHandle.getInstance().force();
+//                forceCountDown.countDown();
+//            });
+
+            IndexHandle.getInstance().force();
 
             // force datafile
             mmap.force();
@@ -194,15 +197,19 @@ public class Aggregator implements Runnable {
             return;
         }
 
-        ByteBuffer dataBuffer = ByteBuffer.allocate(superBatch.getSuperBatchSize());
+//        ByteBuffer dataBuffer = ByteBuffer.allocate(superBatch.getSuperBatchSize());
+        ByteBuffer dataBuffer = DirectBufferPool.getInstance().allocate();
         for (Batch flushBatch:superBatch) {
             for (MessagePutRequest req:flushBatch) {
-                dataBuffer.put(req.getMessage().getData());
+//                dataBuffer.put(req.getMessage().getData());
+                dataBuffer.put(req.getMessage().getData().array(), 0, req.getMessage().getData().remaining());
             }
         }
 
+        dataBuffer.flip();
+
         // 刷盘
-        AppendRes2 appendRes = SSDWriterReader5MMAP.getInstance().append(dataBuffer.array());
+        AppendRes2 appendRes = SSDWriterReader5MMAP.getInstance().append(dataBuffer);
         long sOff = appendRes.getWriteStartOffset();
         MappedByteBuffer mmap = appendRes.getMmap();
 
@@ -212,13 +219,14 @@ public class Aggregator implements Runnable {
         // 更新index
         for (Batch flushBatch:superBatch) {
             for (MessagePutRequest req:flushBatch) {
-                indexHandle.newIndex(req.getMessage().getHashKey(), sOff, (short) req.getMessage().getData().length);
-                sOff += req.getMessage().getData().length;
+                indexHandle.newIndex(req.getMessage().getHashKey(), sOff, (short) req.getMessage().getData().remaining());
+                sOff += req.getMessage().getData().remaining();
             }
         }
 
         TimeCounter.getAggregatorInstance().addTime("2.new index time", (int) (System.nanoTime()-t));
 
         executor.submit(new ForceTask(mmap, superBatch));
+        DirectBufferPool.getInstance().deAllocate(dataBuffer);
     }
 }

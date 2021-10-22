@@ -13,7 +13,7 @@ public class Batch extends ConcurrentLinkedQueue<MessagePutRequest> {
     private AtomicInteger batchSize = new AtomicInteger(0);
 
     // batch聚合上限， 根据第一个加入的req决定
-    private int batchSizeLimit;
+    private int batchSizeLimit = StorageSize.SMALL_BATCH_SIZE;
 
     public Batch() {
 
@@ -24,23 +24,30 @@ public class Batch extends ConcurrentLinkedQueue<MessagePutRequest> {
      * 否则将req加入queue并返回true*/
     public boolean tryToAdd(MessagePutRequest req) {
         // 首个加入batch的req作为head，这个head决定这个batch的聚合上限, 8kb, 16kb or 24kb
-        if (this.isEmpty()) {
-            if (req.getMessage().getData().length <= StorageSize.SMALL_BATCH_SIZE) {
-                batchSizeLimit = StorageSize.SMALL_BATCH_SIZE;
-            } else if (req.getMessage().getData().length <= StorageSize.MIDDLE_BATCH_SIZE) {
-                batchSizeLimit = StorageSize.MIDDLE_BATCH_SIZE;
-            } else if (req.getMessage().getData().length <= StorageSize.LARGE_BATCH_SIZE) {
-                batchSizeLimit = StorageSize.LARGE_BATCH_SIZE;
-            } else {
-                batchSizeLimit = (int) (StorageSize.MB);
-                System.out.println("exceed max batch limit size");
-            }
+//        if (this.isEmpty()) {
+//            if (req.getMessage().getData().remaining() <= StorageSize.SMALL_BATCH_SIZE) {
+//                batchSizeLimit = StorageSize.SMALL_BATCH_SIZE;
+//            } else if (req.getMessage().getData().remaining() <= StorageSize.MIDDLE_BATCH_SIZE) {
+//                batchSizeLimit = StorageSize.MIDDLE_BATCH_SIZE;
+//            } else if (req.getMessage().getData().remaining() <= StorageSize.LARGE_BATCH_SIZE) {
+//                batchSizeLimit = StorageSize.LARGE_BATCH_SIZE;
+//            } else {
+//                batchSizeLimit = (int) (StorageSize.MB);
+//                System.out.println("exceed max batch limit size");
+//            }
+//        }
+
+        // 需要聚合
+        if (req.getMessage().getData().remaining()+batchSize.get() <= batchSizeLimit) {
+            super.add(req);
+            batchSize.addAndGet(req.getMessage().getData().remaining());
+            return true;
         }
 
-        if (req.getMessage().getData().length+batchSize.get() <= batchSizeLimit) {
+        // 如果batch为空且超过8kb直接刷盘
+        if (batchSize.get() == 0) {
             super.add(req);
-            batchSize.addAndGet(req.getMessage().getData().length);
-            return true;
+            batchSize.addAndGet(req.getMessage().getData().remaining());
         }
         return false;
     }

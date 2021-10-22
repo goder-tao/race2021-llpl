@@ -8,6 +8,7 @@ import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import sun.misc.Lock;
 
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -53,13 +54,13 @@ public class PMemThreadSpace2 implements Space2{
      * 不成功向pool申请新的pmem unit，如果内存池已满则pool申请失败，尝试
      * 遍历当前slot中的所有pmem unit写入*/
     @Override
-    public MemoryNode write(byte[] data) {
+    public MemoryNode write(ByteBuffer data) {
         MemoryNode node = null;
         PMemUnit unit = null;
         int slot = 0;
         // 定位slot
         for (int i = 0; i < 8; i++) {
-            if (data.length <= entrySizes[i]) {
+            if (data.remaining() <= entrySizes[i]) {
                 slot = i;
                 break;
             }

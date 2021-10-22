@@ -113,17 +113,18 @@ public class SSDWriterReader5MMAP {
     /**
      * 单线程顺序写入
      * @return: 本次写入的起点和用于force的mmap对象*/
-    public AppendRes2 append(byte[] data) {
+    public AppendRes2 append(ByteBuffer data) {
+        data.rewind();
         // 写入点
         long writeStartOffset = finalPhyOffset;
-        finalPhyOffset += data.length;
+        finalPhyOffset += data.remaining();
         // listSize总是比accSize大一，因为acc只有当前datafile满的时候才会新增，而list在当前文件未满的时候就已经存在datafile的raf对象了
         int listSize = fileList.size();
         int accSize = accumulativePhyOffset.size();
         RandomAccessFile raf = null;
         try {
             // 当前上写入点+写入的长度-上一个文件的累积offset，计算当前文件的大小，超出默认的一个data partition的大小，新建一个分区
-            if (listSize == 1 || (writeStartOffset-accumulativePhyOffset.get(accSize-1))+data.length > StorageSize.GB) {
+            if (listSize == 1 || (writeStartOffset-accumulativePhyOffset.get(accSize-1))+data.remaining() > StorageSize.GB) {
 
                 if (listSize != 1) {
                     // 记录上一个datafile的累计phyOffset
