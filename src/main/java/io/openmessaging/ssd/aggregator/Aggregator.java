@@ -44,7 +44,6 @@ public class Aggregator implements Runnable {
     // 每次run之间的时间间隔
     private long t;
 
-
     public Aggregator(IndexHandle indexHandle) {
         this.indexHandle = indexHandle;
         t = System.nanoTime();
@@ -95,7 +94,10 @@ public class Aggregator implements Runnable {
     public void run() {
         while (true) {
             try {
-                System.out.println("run time: "+(System.nanoTime()-t));
+//                System.out.println("run time: "+(System.nanoTime()-t));
+                TimeCounter.getAggregatorRunCounter().addTime("each run round", (int) (System.nanoTime()-t));
+                TimeCounter.getAggregatorRunCounter().increaseTimes();
+                TimeCounter.getAggregatorRunCounter().analyze();
                 t = System.nanoTime();
                 // 尝试获取信号量并等待一个比较长的时间，用来处理最后一条消息
                 if (!waitPoint.tryAcquire(10, TimeUnit.MILLISECONDS)) {
@@ -144,10 +146,10 @@ public class Aggregator implements Runnable {
                 forceCountDown.countDown();
             });
 
-            IndexHandle.getInstance().force();
+//            IndexHandle.getInstance().force();
 
             // force datafile
-//            mmap.force();
+            mmap.force();
 
 //            try {
 //                raf.getChannel().force(true);

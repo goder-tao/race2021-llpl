@@ -30,6 +30,7 @@ public class TimeCounter {
 
     public static TimeCounter aggregatorTimeCounter = new TimeCounter("Aggregator counter");
 
+    public static TimeCounter aggregatorRunCounter = new TimeCounter("Aggregator run counter");
     private TimeCounter(String name) {
         this.name = name;
         countTimes = new AtomicLong(0);
@@ -91,9 +92,18 @@ public class TimeCounter {
         return aggregatorTimeCounter;
     }
 
-    // 关闭使用
-    public static void disableCounter() {
+    public static TimeCounter getAggregatorRunCounter() {
+        return aggregatorRunCounter;
+    }
+
+    public void disable() {
+        this.isEnable = false;
+    }
+
+    // 关闭所有使用
+    public static void disableAllCounter() {
         managerTimeCounter.isEnable = false;
         aggregatorTimeCounter.isEnable = false;
+        aggregatorRunCounter.isEnable = false;
     }
 }
