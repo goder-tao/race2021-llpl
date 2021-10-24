@@ -65,7 +65,7 @@ public class Manager {
 
     public Manager() {
         // 关闭时间统计
-        TimeCounter.disableAllCounter();
+//        TimeCounter.disableAllCounter();
         coolBlock = new PMemSpace2(MntPath.AEP_PATH + "cold", StorageSize.COLD_SPACE_SIZE);
         hotBlock = new PMemSpace2(MntPath.AEP_PATH + "hot", StorageSize.HOT_SPACE_SIZE);
         scheduler = new Disk2AepScheduler2(coolBlock, coldTopicQueueOffsetHandle);
@@ -151,7 +151,7 @@ public class Manager {
             // 冷热队列判断, 不再有新的队列加入进来, 热队列会被删掉, 根据null值判队列冷热
             if (node == null) {  // 热队列
                 if (dramCache != null && dramCache.isCacheAvailable()) {  // 缓存在dram
-                    dramCache.put(topic + queueId, appendOffset, ByteBufferUtil.copyFromDirect(data));
+                    dramCache.put(topic + queueId, appendOffset, ByteBufferUtil.copyFrom(data));
                 } else {  // 缓存在aep
 
                     MemoryNode memoryNode = writePMemOnly(hotBlock, data, tName);
