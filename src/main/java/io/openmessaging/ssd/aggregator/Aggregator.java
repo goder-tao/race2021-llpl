@@ -94,7 +94,7 @@ public class Aggregator implements Runnable {
     public void run() {
         while (true) {
             try {
-                System.out.println("run time: "+(System.nanoTime()-t));
+//                System.out.println("run time: "+(System.nanoTime()-t));
                 TimeCounter.getAggregatorRunCounter().addTime("each run round", (int) (System.nanoTime()-t));
                 TimeCounter.getAggregatorRunCounter().increaseTimes();
                 TimeCounter.getAggregatorRunCounter().analyze();
@@ -115,12 +115,12 @@ public class Aggregator implements Runnable {
                     }
                 }
 
-                System.out.println("flush wait time: "+(System.nanoTime()-t));
+//                System.out.println("flush wait time: "+(System.nanoTime()-t));
 
-                logger.info("wait queue length: "+flushBatchQueue.size());
+//                logger.info("wait queue length: "+flushBatchQueue.size());
                 long T = System.nanoTime();
                 doFlush();
-                System.out.println("do flush time: "+(System.nanoTime()-T));
+//                System.out.println("do flush time: "+(System.nanoTime()-T));
             } catch (Exception e) {
                 e.printStackTrace();
                 logger.error("aggregator waitPoint, "+e.toString());

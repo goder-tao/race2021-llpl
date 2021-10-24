@@ -65,7 +65,7 @@ public class Manager {
 
     public Manager() {
         // 关闭时间统计
-//        TimeCounter.disableAllCounter();
+        TimeCounter.disableAllCounter();
         coolBlock = new PMemSpace2(MntPath.AEP_PATH + "cold", StorageSize.COLD_SPACE_SIZE);
         hotBlock = new PMemSpace2(MntPath.AEP_PATH + "hot", StorageSize.HOT_SPACE_SIZE);
         scheduler = new Disk2AepScheduler2(coolBlock, coldTopicQueueOffsetHandle);
