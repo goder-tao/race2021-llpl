@@ -31,9 +31,9 @@ public class Aggregator implements Runnable {
 
     private final Logger logger = LogManager.getLogger(Aggregator.class.getName());
     // 线程池、异步force
-    private final ExecutorService executor = Executors.newFixedThreadPool(30);
+    private final ExecutorService executor = Executors.newFixedThreadPool(3);
     // 并行index force线程池
-    private final ExecutorService forceExecutor = Executors.newFixedThreadPool(30);
+    private final ExecutorService forceExecutor = Executors.newFixedThreadPool(3);
     // 使用一个信号量进行唤醒
     private final Semaphore waitPoint = new Semaphore(0);
     private AtomicBoolean hasNewed = new AtomicBoolean(false);
@@ -94,7 +94,7 @@ public class Aggregator implements Runnable {
     public void run() {
         while (true) {
             try {
-//                System.out.println("run time: "+(System.nanoTime()-t));
+                System.out.println("run time: "+(System.nanoTime()-t));
                 TimeCounter.getAggregatorRunCounter().addTime("each run round", (int) (System.nanoTime()-t));
                 TimeCounter.getAggregatorRunCounter().increaseTimes();
                 TimeCounter.getAggregatorRunCounter().analyze();
@@ -148,6 +148,7 @@ public class Aggregator implements Runnable {
             forceExecutor.execute(() -> {
                 IndexHandle.getInstance().force();
                 forceCountDown.countDown();
+                Thread.yield();
             });
 
 //            IndexHandle.getInstance().force();
@@ -179,6 +180,7 @@ public class Aggregator implements Runnable {
             }
 
             TimeCounter.getAggregatorInstance().addTime("4.count down time", (int) (System.nanoTime()-t));
+            Thread.yield();
         }
     }
 
