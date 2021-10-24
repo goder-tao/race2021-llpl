@@ -34,6 +34,7 @@ public class Aggregator implements Runnable {
     private final ExecutorService executor = Executors.newFixedThreadPool(20);
     // 并行index force线程池
     private final ExecutorService forceExecutor = Executors.newFixedThreadPool(20);
+
     // 使用一个信号量进行唤醒
     private final Semaphore waitPoint = new Semaphore(0);
     private AtomicBoolean hasNewed = new AtomicBoolean(false);
@@ -101,7 +102,7 @@ public class Aggregator implements Runnable {
                 t = System.nanoTime();
 
                 // 尝试获取信号量并等待一个比较长的时间，用来处理最后一条消息
-                if (!waitPoint.tryAcquire(10, TimeUnit.MILLISECONDS)) {
+                if (!waitPoint.tryAcquire(4, TimeUnit.MILLISECONDS)) {
                     if (!batch.isEmpty()) {
 //                        flushBatchQueue.offer(batch);
 //                        batch = new Batch();

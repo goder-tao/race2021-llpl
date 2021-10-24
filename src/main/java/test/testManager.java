@@ -59,7 +59,7 @@ public class testManager {
         Thread[] threads = new Thread[30];
 
         for (int i = 0; i < threads.length; i++) {
-            threads[i] = new Thread(new WriterRunner(manager, i, 2000));
+            threads[i] = new Thread(new WriterRunner(manager, i, 200));
             threads[i].start();
         }
 
@@ -90,7 +90,7 @@ public class testManager {
 //        }
 //
         // 冷读
-        testParallelRead(manager, "test0", 0, 25, 40, "test1", 0, 30, 50);
+        testParallelRead(manager, "test0", 0, 25, 100, "test1", 0, 30, 50);
         // 热读
         testParallelRead(manager, "test2", 0, 70, 110, "test3", 0, 140, 160);
 
@@ -175,7 +175,7 @@ public class testManager {
         Random random = new Random();
         for (int i = s; i < e; i++) {
             int r = 100 + random.nextInt(17000);
-            ByteBuffer data = ByteBuffer.allocate(r);
+            ByteBuffer data = ByteBuffer.allocate(4);
             data.putInt(i);
             manager.append(topic, qid, data);
         }
