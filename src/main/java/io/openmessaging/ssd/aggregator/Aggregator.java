@@ -34,6 +34,7 @@ public class Aggregator implements Runnable {
     private final ExecutorService executor = Executors.newFixedThreadPool(20);
     // 并行index force线程池
     private final ExecutorService forceExecutor = Executors.newFixedThreadPool(20);
+
     // 使用一个信号量进行唤醒
     private final Semaphore waitPoint = new Semaphore(0);
     private AtomicBoolean hasNewed = new AtomicBoolean(false);
